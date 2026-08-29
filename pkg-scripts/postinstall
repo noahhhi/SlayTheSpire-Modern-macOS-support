@@ -4,11 +4,21 @@
 set -u
 
 DIR='/Library/Application Support/SlayTheSpire-Modern-Installer'
-cleanup() { rm -rf "$DIR"; }
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUN_INSTALLER="$SCRIPT_DIR/run-installer.sh"
+cleanup() { rm -rf "$DIR" 2>/dev/null || true; }
 trap cleanup EXIT
 
 [ -d "$DIR" ] && [ ! -L "$DIR" ] || {
   echo '[sts-modern] invalid or missing package payload directory' >&2
+  exit 1
+}
+[ -x "$DIR/install.sh" ] || {
+  echo '[sts-modern] package install.sh is missing or not executable' >&2
+  exit 1
+}
+[ -x "$RUN_INSTALLER" ] || {
+  echo '[sts-modern] package status runner is missing or not executable' >&2
   exit 1
 }
 
@@ -27,7 +37,13 @@ USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | 
 }
 USER_UID="$(id -u "$CONSOLE_USER")" || exit 1
 
-chmod -R a+rX "$DIR"
-launchctl asuser "$USER_UID" sudo -u "$CONSOLE_USER" \
+chmod -R a+rX "$DIR" || exit 1
+INSTALL_RC=0
+"$RUN_INSTALLER" \
+  launchctl asuser "$USER_UID" sudo -u "$CONSOLE_USER" \
   env HOME="$USER_HOME" USER="$CONSOLE_USER" LOGNAME="$CONSOLE_USER" \
-  "$DIR/install.sh"
+  "$DIR/install.sh" || INSTALL_RC=$?
+
+# Do not leave a trailing test expression here. PackageKit must receive the
+# exact install.sh status: zero for success, non-zero for a safety refusal.
+exit "$INSTALL_RC"

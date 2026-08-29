@@ -59,7 +59,8 @@ cp -R "$STAGE/." "$PKGROOT$INSTALL_LOCATION/"
 # produce misleading "write: Permission denied" diagnostics.
 chmod -R u+w "$PKGROOT"
 cp pkg-scripts/postinstall "$PKGSCRIPTS/postinstall"
-chmod +x "$PKGSCRIPTS/postinstall"
+cp pkg-scripts/run-installer.sh "$PKGSCRIPTS/run-installer.sh"
+chmod +x "$PKGSCRIPTS/postinstall" "$PKGSCRIPTS/run-installer.sh"
 PKG="$DIST/SlayTheSpire-Modern-macOS-v${VERSION}-universal.pkg"
 pkgbuild --root "$PKGROOT" --scripts "$PKGSCRIPTS" \
   --component-plist packaging/components.plist \
