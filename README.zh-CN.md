@@ -9,6 +9,8 @@ Universal 发布包支持 Intel 与 Apple Silicon Mac，最低系统为 macOS 11
 
 - 内置 `x86_64` 与 `arm64` 两套 Azul Zulu OpenJDK 8 原生运行时。
 - 窗口、无边框和 macOS 原生 Space 全屏均支持 Retina 渲染。
+- Retina drawable 不超过显示面板的原生物理像素，避免在 2560×1600 面板上因
+  系统缩放模式额外创建 2880×1800 的渲染表面。
 - 窗口可自由缩放；输入保持逻辑点坐标，OpenGL viewport 与字体按物理像素渲染，
   4:3 到 21:9 之间可连续自由调整，仅拦截会破坏布局的极窄/极宽比例（最小
   800×450）；调整时不会重建 UI，也不会重新叠加菜单 BGM/环境音。
@@ -69,6 +71,12 @@ jar、当前架构的 Zulu JRE，并在临时目录构造候选 jar 和 Universa
 `/usr/bin/lipo` 在临时目录合成 Universal dylib；绝不会拿未修改的原版 LWJGL x86
 slice 代替新 JNI。工具、新 JNI 或架构 slice 缺失都会在移动游戏文件前失败。
 
+原版 jar 的 `libsteam_api.dylib` 已包含 i386/x86_64/arm64，并带有效签名；安装器
+逐字节保留它。对该文件瘦身、合并或换成 ad-hoc 版本可能破坏 Rosetta AOT 的代码
+签名 supplement。迁移后的 arm64 bridge 会用独立的 arm-only 文件名加载与其 ABI
+匹配的可再分发 API；Intel 仍加载官方原版。其他需要合并的 Universal dylib 在进入
+候选 jar 前会重新 ad-hoc 签名并验证。
+
 ## 备份、回滚与卸载
 
 安装器将原 JRE、jar、启动器与 `Info.plist` 保存在游戏旁的
@@ -103,6 +111,9 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
 - **发现旧 ARM64 备份：** 先用 v1.0.0 的 `uninstall.sh` 还原并确认原版能启动，
   再安装 v1.1.0。
 - **提示游戏正在运行：** 完全退出游戏后重试。
+- **直接启动崩溃在 `SteamAppsNative_getAppBuildId`：** Steamworks 未初始化，游戏
+  随后解引用了空的 `SteamApps` 接口。运行验收应从 Steam 客户端启动；直接执行
+  Java 或 Finder App 不能验证 Steam 集成。
 - **未找到自定义库：** 按上例传入 `.app` 的完整路径。
 - **崩溃报告：** 位于 `~/Library/Logs/DiagnosticReports/`。
 

@@ -26,6 +26,7 @@ cp install.sh uninstall.sh 'Install SlayTheSpire Modern macOS.command' \
   README.md README.zh-CN.md RELEASE_NOTES.md VERSION supported-versions.sha256 "$STAGE/"
 cp -R payload "$STAGE/payload"
 rm -f "$STAGE/payload/version.txt"
+rm -f "$STAGE/payload/jar/libsteam_api.dylib" "$STAGE/payload/jar/libsteam_api.dylib.sha1"
 find "$STAGE" -name '.DS_Store' -delete
 find "$STAGE" -name '._*' -delete
 chmod +x "$STAGE/install.sh" "$STAGE/uninstall.sh" \

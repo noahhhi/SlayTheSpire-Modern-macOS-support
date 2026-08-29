@@ -10,6 +10,8 @@ Silicon Macs running macOS 11 or later.
 
 - Native `x86_64` and `arm64` Azul Zulu OpenJDK 8 runtimes.
 - Retina-aware windowed, borderless, and native macOS Space fullscreen modes.
+- Retina drawable size is capped to the display panel's native pixel dimensions,
+  avoiding oversized scaled-mode surfaces such as 2880×1800 on a 2560×1600 panel.
 - Freely resizable windows with logical-point input and physical-pixel OpenGL
   viewports/font rasterization. Ratios remain continuously adjustable from 4:3
   through 21:9; only layout-breaking extremes are clamped (minimum 800×450),
@@ -81,6 +83,14 @@ assemble Universal dylibs in a temporary directory. It never substitutes the
 original unpatched LWJGL slice. Missing tools, patched JNI, or slices fail
 during preflight, before any game file is moved.
 
+The Steam jar's original `libsteam_api.dylib` is already signed and contains
+i386, x86_64, and arm64 slices. The installer preserves it byte-for-byte;
+thinning, merging, or ad-hoc replacing that library can invalidate Rosetta's
+AOT code-signature supplement. The migrated arm64 bridge loads its matching
+redistributable API under a separate arm-only name; Intel continues to load the
+official original. Other assembled Universal dylibs are ad-hoc signed and
+verified before they enter the candidate jar.
+
 ## Backup, rollback, and uninstall
 
 Installation preserves the original JRE, jar, launcher, and `Info.plist` in
@@ -118,6 +128,10 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
 - **Legacy ARM64 backup found:** run the v1.0.0 `uninstall.sh` first, confirm
   Steam launches the original game, then install v1.1.0.
 - **Game is running:** quit it completely and retry.
+- **Direct launch crashes in `SteamAppsNative_getAppBuildId`:** Steamworks was
+  not initialized, so the game's integration dereferenced a null `SteamApps`
+  interface. Launch from the Steam client for runtime acceptance; direct Java
+  or Finder launch is not a valid Steam-integration test.
 - **Custom Steam library not detected:** pass the full `.app` path as shown
   above.
 - **Crash reports:** see `~/Library/Logs/DiagnosticReports/`.

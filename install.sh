@@ -140,6 +140,11 @@ trap cleanup EXIT INT TERM HUP
 mkdir -p "$WORK/jar-overlay" "$WORK/original-natives" "$WORK/staged"
 cp -R "$PAYLOAD/jar/." "$WORK/jar-overlay/"
 
+# The verified Steam jar already ships a signed i386/x86_64/arm64 Steam API.
+# Preserve those exact bytes and its hardened-runtime signature. Replacing it
+# with a locally thinned/ad-hoc copy breaks Rosetta's AOT signature supplement.
+rm -f "$WORK/jar-overlay/libsteam_api.dylib" "$WORK/jar-overlay/libsteam_api.dylib.sha1"
+
 # Public release assets contain only patch-native arm64 slices. The x86_64
 # slices are taken from this user's hash-verified Steam jar and combined into
 # Universal binaries locally, so no original game binary is redistributed.
@@ -148,7 +153,6 @@ UNIVERSAL_NATIVES=(
   libgdx-freetype64.dylib
   libgdx64.dylib
   liblwjgl.dylib
-  libsteam_api.dylib
   libsteamworks4j.dylib
   openal.dylib
 )
@@ -159,19 +163,27 @@ for native in "${UNIVERSAL_NATIVES[@]}"; do
   patched_archs="$(/usr/bin/lipo -archs "$patched" 2>/dev/null || true)"
   case " $patched_archs " in *" arm64 "*) ;; *) fail "$native has no arm64 slice" ;; esac
 
-  if ! printf ' %s ' "$patched_archs" | grep -q ' x86_64 '; then
-    [ "$native" != 'liblwjgl.dylib' ] || fail "patched liblwjgl.dylib is not Universal; its new fullscreen JNI requires patched arm64 and x86_64 slices"
+  if [ "$native" = 'liblwjgl.dylib' ]; then
+    printf ' %s ' "$patched_archs" | grep -q ' x86_64 ' \
+      || fail "patched liblwjgl.dylib is not Universal; its new fullscreen JNI requires patched arm64 and x86_64 slices"
+  else
     unzip -p "$JAR" "$native" > "$WORK/original-natives/$native" \
       || fail "the verified Steam jar has no $native"
     original_archs="$(/usr/bin/lipo -archs "$WORK/original-natives/$native" 2>/dev/null || true)"
     case " $original_archs " in *" x86_64 "*) ;; *) fail "original $native has no x86_64 slice" ;; esac
-    /usr/bin/lipo -create "$patched" "$WORK/original-natives/$native" -output "$WORK/jar-overlay/$native.universal"
+    /usr/bin/lipo -extract arm64 "$patched" -output "$WORK/jar-overlay/$native.arm64"
+    /usr/bin/lipo -extract x86_64 "$WORK/original-natives/$native" -output "$WORK/jar-overlay/$native.x86_64"
+    /usr/bin/lipo -create "$WORK/jar-overlay/$native.arm64" "$WORK/jar-overlay/$native.x86_64" \
+      -output "$WORK/jar-overlay/$native.universal"
+    rm -f "$WORK/jar-overlay/$native.arm64" "$WORK/jar-overlay/$native.x86_64"
     mv "$WORK/jar-overlay/$native.universal" "$patched"
   fi
 
   final_archs="$(/usr/bin/lipo -archs "$patched")"
   case " $final_archs " in *" arm64 "*) ;; *) fail "$native Universal verification lost arm64" ;; esac
   case " $final_archs " in *" x86_64 "*) ;; *) fail "$native Universal verification lost x86_64" ;; esac
+  codesign --force -s - "$patched"
+  codesign --verify --strict "$patched" || fail "$native ad-hoc signature verification failed"
   printf '%s\r\n' "$(shasum -a 1 "$patched" | awk '{print $1}')" > "$patched.sha1"
 done
 
