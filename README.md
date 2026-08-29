@@ -3,22 +3,21 @@
 [简体中文](README.zh-CN.md)
 
 A community compatibility patch for the Steam macOS release of *Slay the
-Spire*. Version 1.2.0 is one Universal distribution for Intel and Apple
+Spire*. Version 1.2.1 is one Universal distribution for Intel and Apple
 Silicon Macs running macOS 11 or later.
 
 ## Features
 
 - Native `x86_64` and `arm64` Azul Zulu OpenJDK 8 runtimes.
 - Retina-aware windowed, borderless, and native macOS Space fullscreen modes.
-- Retina drawable size is capped to the display panel's native pixel dimensions,
-  avoiding oversized scaled-mode surfaces such as 2880×1800 on a 2560×1600 panel.
-- On a 2560×1600 Retina panel, a fixed 1280×800 game canvas renders into a
-  2560×1600 backing surface instead of using a fractional 1440×900 mapping.
+- Retina backing follows macOS's HiDPI scale up to 2× instead of being capped to
+  the panel's physical pixel count. A 1440×900 logical canvas therefore renders
+  into a full 2880×1800 OpenGL backing surface for sharp text and UI.
 - Windows remain continuously resizable from 4:3 through 21:9 rather than being
   locked to one ratio. Only layout-breaking extremes and sizes beyond the
-  current display's natural Retina 2× capacity are clamped (1280×800 maximum
-  on this panel, 800×450 minimum). Other ratios use a centered safe viewport,
-  with matching input mapping and no UI/audio reconstruction.
+  current display's logical desktop are clamped (1440×900 maximum in this
+  configuration, 800×450 minimum). Other ratios use a centered safe viewport,
+  with matching point-based input mapping and no UI/audio reconstruction.
 - One fullscreen behavior for the in-game Fullscreen toggle, Borderless
   Fullscreen toggle, and the green window button.
 - Automatic Steam library discovery, including additional libraries listed in
@@ -26,29 +25,31 @@ Silicon Macs running macOS 11 or later.
 - Strict original-jar SHA-256 validation, payload checksum verification,
   exact-file backup, and automatic rollback on installation failure. Repeating
   the exact installed build fully revalidates the JAR, JRE, launcher,
-  `Info.plist`, and signature, then returns success instead of a false PKG
-  failure.
+  and `Info.plist`, then returns success instead of a false PKG failure. Mutable
+  game preferences may change normally after launch without being mistaken for
+  patch corruption.
 
 The release contains patch files and redistributable runtimes only. It does
 not contain `desktop-1.0.jar`, the game app, saves, art, audio, or other game
 content. You must own and install the Steam version first.
 
 When macOS is set to “Looks like 1440×900,” WindowServer still composites at
-2880×1800 before scaling to the 2560×1600 panel. This patch keeps the game's
-OpenGL drawable at or below 2560×1600 and rasterizes game units at 2×; it
-cannot bypass the system compositor's final resampling step.
+2880×1800 before scaling to the 2560×1600 panel. The patch intentionally uses
+that complete 2× backing surface: game/input coordinates stay at 1440×900 while
+OpenGL and fonts rasterize at 2880×1800. WindowServer performs the final panel
+resampling, just as it does for other Retina-aware apps.
 
 ## Install
 
 ### PKG (recommended)
 
-1. Download `SlayTheSpire-Modern-macOS-v1.2.0-universal.pkg` and its `.sha256`
+1. Download `SlayTheSpire-Modern-macOS-v1.2.1-universal.pkg` and its `.sha256`
    file from [Releases](../../releases).
 2. Optional integrity check:
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.0-universal.pkg.sha256
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.1-universal.pkg.sha256
    ```
 
 3. Open the package. It finds the logged-in user's Steam library and runs the
@@ -60,7 +61,7 @@ Gatekeeper globally.
 
 ### ZIP fallback
 
-1. Download and verify `SlayTheSpire-Modern-macOS-v1.2.0-universal.zip`.
+1. Download and verify `SlayTheSpire-Modern-macOS-v1.2.1-universal.zip`.
 2. Extract it and double-click `Install SlayTheSpire Modern macOS.command`, or
    run:
 
@@ -137,7 +138,7 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
   checksum-bypass option because applying bytecode patches to an unknown build
   is unsafe.
 - **Legacy ARM64 backup found:** run the v1.0.0 `uninstall.sh` first, confirm
-  Steam launches the original game, then install v1.2.0.
+  Steam launches the original game, then install v1.2.1.
 - **Game is running:** quit it completely and retry.
 - **Direct launch crashes in `SteamAppsNative_getAppBuildId`:** Steamworks was
   not initialized, so the game's integration dereferenced a null `SteamApps`

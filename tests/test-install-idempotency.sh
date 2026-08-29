@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/install-state.sh"
+PATCH_VERSION="$(tr -d '\r\n' < "$ROOT/VERSION")"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/sts-install-state-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 
@@ -13,6 +14,7 @@ CONTENTS="$APP/Contents"
 RES="$CONTENTS/Resources"
 MACOS_DIR="$CONTENTS/MacOS"
 INFO="$CONTENTS/Info.plist"
+DISPLAY_CONFIG="$RES/info.displayconfig"
 BACKUP="$WORK/SlayTheSpire-Modern-backup"
 OVERLAY="$WORK/overlay"
 ORIGINAL_ROOT="$WORK/original-jar"
@@ -38,6 +40,7 @@ printf '%s\n' \
   '<key>NSHighResolutionCapable</key><true/>' \
   '<key>LSMinimumSystemVersion</key><string>11.0</string>' \
   '</dict></plist>' > "$INFO"
+printf '1440\n900\n60\nfalse\nfalse\ntrue\n' > "$DISPLAY_CONFIG"
 
 (
   cd "$ORIGINAL_ROOT"
@@ -63,7 +66,7 @@ export STS_TEST_JAVA_LOG="$WORK/java-version.log"
 PAYLOAD_FINGERPRINT="$(shasum -a 256 "$WORK/payload.sha256" | awk '{print $1}')"
 ORIGINAL_SHA="$(shasum -a 256 "$BACKUP/desktop-1.0.jar" | awk '{print $1}')"
 
-sts_record_install_state "$BACKUP" '1.2.0' "$PAYLOAD_FINGERPRINT" \
+sts_record_install_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$ORIGINAL_SHA" "$RES/desktop-1.0.jar" "$RES/jre" \
   "$MACOS_DIR/SlayTheSpire" "$INFO" "$OVERLAY"
 [ -s "$BACKUP/install-manifest.txt" ] \
@@ -71,13 +74,13 @@ sts_record_install_state "$BACKUP" '1.2.0' "$PAYLOAD_FINGERPRINT" \
   && [ -s "$BACKUP/installed-overlay.sha256" ]
 echo 'first install: state recorded successfully'
 
-sts_verify_installed_state "$BACKUP" '1.2.0' "$PAYLOAD_FINGERPRINT" \
+sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
   "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"
 [ "$(wc -l < "$STS_TEST_JAVA_LOG" | tr -d ' ')" -eq 1 ]
 echo 'same build repeat: accepted as already installed'
 
-if sts_verify_installed_state "$BACKUP" '1.2.0' \
+if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" \
   'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
   "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"; then
@@ -87,20 +90,15 @@ fi
 [ "$STS_STATE_ERROR" = 'installed payload fingerprint differs' ]
 echo 'same version different build: safely refused'
 
-rm -rf "$CONTENTS/_CodeSignature"
-if sts_verify_installed_state "$BACKUP" '1.2.0' "$PAYLOAD_FINGERPRINT" \
+printf '1280\n800\n60\ntrue\nfalse\ntrue\n' > "$DISPLAY_CONFIG"
+sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
-  "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"; then
-  echo 'broken app signature was incorrectly accepted' >&2
-  exit 1
-fi
-[ "$STS_STATE_ERROR" = 'installed app code signature verification failed' ]
-echo 'broken app signature: safely refused'
-/usr/bin/codesign --force --deep -s - "$APP"
+  "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"
+echo 'mutable game display config: accepted after launch'
 
 cp "$INFO" "$WORK/installed-Info.plist"
 printf '<!-- tampered -->\n' >> "$INFO"
-if sts_verify_installed_state "$BACKUP" '1.2.0' "$PAYLOAD_FINGERPRINT" \
+if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
   "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"; then
   echo 'tampered Info.plist was incorrectly accepted' >&2
@@ -111,7 +109,7 @@ echo 'tampered Info.plist: safely refused'
 cp "$WORK/installed-Info.plist" "$INFO"
 
 rm "$MACOS_DIR/SlayTheSpire"
-if sts_verify_installed_state "$BACKUP" '1.2.0' "$PAYLOAD_FINGERPRINT" \
+if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
   "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"; then
   echo 'partial install was incorrectly accepted' >&2

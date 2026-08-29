@@ -30,6 +30,16 @@ OVERLAY_CLASS_COUNT="$(find payload/jar -type f -name '*.class' | wc -l | tr -d 
 [ "$OVERLAY_CLASS_COUNT" -eq 42 ] \
   || { echo "unexpected Java overlay size: $OVERLAY_CLASS_COUNT classes (expected 42)" >&2; exit 1; }
 
+GEOMETRY_CLASS='payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class'
+GRAPHICS_CLASS='payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglGraphics.class'
+LC_ALL=C grep -a -q 'fitViewport' "$GEOMETRY_CLASS" \
+  || { echo 'safe fitted-viewport helper is missing from the GDX overlay' >&2; exit 1; }
+if LC_ALL=C grep -a -q 'capLogicalSize' "$GEOMETRY_CLASS" \
+  || LC_ALL=C grep -a -q 'getPhysicalDisplayWidth\|getPhysicalDisplayHeight' "$GRAPHICS_CLASS"; then
+  echo 'stale physical-panel Retina cap found in the GDX overlay; v1.2.1 requires full 2x backing' >&2
+  exit 1
+fi
+
 (shasum -a 256 -c payload.sha256) >/dev/null
 for arch in arm64 x86_64; do
   archs="$(/usr/bin/lipo -archs "payload/jre/$arch/bin/java")"

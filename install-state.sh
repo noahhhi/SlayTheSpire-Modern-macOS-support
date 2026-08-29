@@ -171,8 +171,11 @@ sts_verify_installed_state() {
     fi
   done < "$jar_delete"
 
-  /usr/bin/codesign --verify --deep --strict "$app" >/dev/null 2>&1 \
-    || sts_state_error 'installed app code signature verification failed' || return 1
+  # The game legitimately rewrites mutable sealed resources such as
+  # info.displayconfig after launch. The installer verifies the complete app
+  # signature immediately after signing; repeat-install state checks instead
+  # validate every patch-managed artifact above so normal gameplay does not
+  # become a false corruption report.
   "$resources/jre/bin/java" -version >/dev/null 2>&1 \
     || sts_state_error "installed $host_arch JRE failed its launch test" || return 1
   return 0

@@ -1,4 +1,4 @@
-# v1.2.0 — Physical-pixel Retina layout and idempotent PKG
+# v1.2.1 — Full 2× Retina backing and post-launch-safe PKG
 
 ## 中文
 
@@ -6,17 +6,16 @@
   两种架构均使用 Azul Zulu OpenJDK 8.96.0.205 原生 JRE。
 - 窗口、无边框、设置内全屏与绿色按钮统一为支持 Retina 的 macOS 原生 Space
   全屏路径。
-- 2560×1600 Retina 面板使用固定 1280×800 游戏逻辑画布，窗口与全屏最终
-  OpenGL backing/viewport 均不超过 2560×1600；避免 1440×900 逻辑画布造成
-  1.777× fractional rasterization 和 1 像素 viewport 误差。
-- 普通窗口按当前屏幕 `物理像素 / natural backing scale` 限制最大尺寸，本机为
-  1280×800。窗口比例仍可在 4:3–21:9 内连续调整；安全 viewport 与输入映射会
-  对其他比例居中适配，不再拉伸或错位 UI。
+- 1440×900 游戏逻辑画布使用完整 2× HiDPI backing，窗口与全屏均以
+  2880×1800 OpenGL backing/viewport 渲染；输入仍保持 1440×900 point 坐标。
+- 普通窗口最大尺寸跟随当前逻辑桌面（当前配置为 1440×900），不再按面板
+  2560×1600 物理像素反推 1280×800 上限。窗口比例仍可在 4:3–21:9 内连续调整；
+  安全 viewport 与输入映射会对其他比例居中适配，不再拉伸或错位 UI。
 - 同一 build 重复运行 PKG 会严格复核 payload fingerprint、原版备份、当前 JAR、
-  JRE 全文件、启动器、Info.plist 和 App 签名；完全一致时返回成功，损坏、半安装
-  或同版本不同 build 仍安全拒绝。
-- Retina drawable 以显示面板的原生物理像素为上限；本机 2560×1600 面板不再
-  按系统的 2880×1800 缩放虚拟模式渲染。
+  JRE 全文件、启动器和 Info.plist；完全一致时返回成功，损坏、半安装或同版本
+  不同 build 仍安全拒绝。游戏正常改写 `info.displayconfig` 后也可安全重复安装。
+- Retina drawable 跟随 macOS backing scale，最高使用完整 2×；在“看起来像
+  1440×900”模式下允许 2880×1800 backing，再由 WindowServer 缩放到物理面板。
 - 窗口现在可自由缩放；UI/输入继续使用逻辑点，OpenGL 与字体使用 Retina backing
   像素。4:3 到 21:9 之间可连续自由调整，仅拦截会破坏布局的极窄/极宽比例
   （最小 800×450）；同时修复重复创建菜单 BGM/环境音，以及退出动画误写窗口
@@ -29,7 +28,7 @@
   Intel 逐字节保留官方签名的 Steam API；arm64 bridge 以独立文件名加载 ABI 匹配
   的可再分发 API，避免破坏 Rosetta 签名或混用 SDK。
 
-安装优先下载 `SlayTheSpire-Modern-macOS-v1.2.0-universal.pkg`；若 PKG 无法使用，
+安装优先下载 `SlayTheSpire-Modern-macOS-v1.2.1-universal.pkg`；若 PKG 无法使用，
 下载 ZIP 并双击 `Install SlayTheSpire Modern macOS.command`。卸载运行
 `uninstall.sh`。
 
@@ -39,19 +38,21 @@
   with native Azul Zulu OpenJDK 8.96.0.205 JREs for both architectures.
 - Windowed, borderless, in-game fullscreen, and the green window button share
   the Retina-aware native macOS Space fullscreen path.
-- A fixed 1280×800 game canvas now renders into a final 2560×1600 OpenGL
-  backing/viewport on a 2560×1600 Retina panel, avoiding fractional 1.777×
-  rasterization and one-pixel viewport drift.
-- Normal windows are capped to `physical pixels / natural backing scale`
-  (1280×800 here) while remaining continuously adjustable from 4:3 through
-  21:9. A centered safe viewport and matching input transform prevent UI
-  stretching or misalignment at other supported ratios.
+- A 1440×900 game canvas now uses a complete 2× HiDPI surface, rendering
+  windowed and fullscreen OpenGL backing/viewports at 2880×1800 while input
+  remains in 1440×900 point coordinates.
+- Normal-window maximum size follows the current logical desktop (1440×900 in
+  this configuration), rather than deriving a 1280×800 cap from the panel's
+  2560×1600 physical pixels. Windows remain continuously adjustable from 4:3
+  through 21:9, with a centered safe viewport and matching input transform.
 - Repeating the exact PKG build now validates the payload fingerprint, original
-  backup, current JAR, every JRE file, launcher, `Info.plist`, and app signature,
-  then returns success. Corrupt, partial, or same-version/different-build states
-  are still rejected safely.
-- Retina drawables are capped to each panel's native physical pixels, avoiding
-  a 2880×1800 scaled-mode render surface on a 2560×1600 panel.
+  backup, current JAR, every JRE file, launcher, and `Info.plist`, then returns
+  success. Corrupt, partial, or same-version/different-build states are still
+  rejected safely, while normal post-launch `info.displayconfig` changes remain
+  accepted.
+- Retina drawables follow the macOS backing scale up to a complete 2×. In
+  “Looks like 1440×900” mode, the game may use a 2880×1800 backing surface and
+  lets WindowServer perform the final resampling to the physical panel.
 - Windows are freely resizable: UI/input remain in logical points while OpenGL
   and fonts use Retina backing pixels. Ratios remain continuously adjustable
   from 4:3 through 21:9; only layout-breaking extremes are clamped (minimum
