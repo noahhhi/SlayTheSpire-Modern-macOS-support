@@ -23,7 +23,8 @@ trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 rm -rf "$DIST"
 mkdir -p "$DIST" "$STAGE" "$PKGROOT$INSTALL_LOCATION" "$PKGSCRIPTS"
 cp install.sh uninstall.sh 'Install SlayTheSpire Modern macOS.command' \
-  README.md README.zh-CN.md RELEASE_NOTES.md VERSION supported-versions.sha256 "$STAGE/"
+  install-state.sh README.md README.zh-CN.md RELEASE_NOTES.md VERSION \
+  supported-versions.sha256 "$STAGE/"
 cp -R payload "$STAGE/payload"
 rm -f "$STAGE/payload/version.txt"
 rm -f "$STAGE/payload/jar/libsteam_api.dylib" "$STAGE/payload/jar/libsteam_api.dylib.sha1"

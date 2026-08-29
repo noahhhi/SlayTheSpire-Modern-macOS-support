@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-这是面向 Steam macOS 版《杀戮尖塔》的社区兼容补丁。v1.1.1 使用同一份
+这是面向 Steam macOS 版《杀戮尖塔》的社区兼容补丁。v1.2.0 使用同一份
 Universal 发布包支持 Intel 与 Apple Silicon Mac，最低系统为 macOS 11。
 
 ## 功能
@@ -11,27 +11,36 @@ Universal 发布包支持 Intel 与 Apple Silicon Mac，最低系统为 macOS 11
 - 窗口、无边框和 macOS 原生 Space 全屏均支持 Retina 渲染。
 - Retina drawable 不超过显示面板的原生物理像素，避免在 2560×1600 面板上因
   系统缩放模式额外创建 2880×1800 的渲染表面。
-- 窗口可自由缩放；输入保持逻辑点坐标，OpenGL viewport 与字体按物理像素渲染，
-  4:3 到 21:9 之间可连续自由调整，仅拦截会破坏布局的极窄/极宽比例（最小
-  800×450）；调整时不会重建 UI，也不会重新叠加菜单 BGM/环境音。
+- 在 2560×1600 Retina 面板上使用固定 1280×800 游戏画布并渲染到
+  2560×1600 backing，避免 1440×900 points 对应 1.777× fractional surface。
+- 普通窗口可在 4:3 到 21:9 内连续自由调整，不锁定单一比例；仅限制会破坏布局
+  的极端比例和超过当前屏幕 natural Retina 2× 能力的尺寸（本机最大
+  1280×800，最小 800×450）。其他比例使用居中的安全 viewport，不拉伸 UI；
+  输入同步映射，调整时不会重建 UI 或重新叠加菜单 BGM/环境音。
 - 游戏“全屏”、“无边框全屏”和窗口绿色按钮使用一致的原生 Space 全屏行为。
 - 自动查找默认 Steam 库及 `libraryfolders.vdf` 中的附加库。
-- 安装前严格校验原版 jar SHA-256 与补丁 payload，备份原文件，失败自动回滚。
+- 安装前严格校验原版 jar SHA-256 与补丁 payload，备份原文件，失败自动回滚；
+  重复运行完全相同的已安装 build 会完整复核 JAR/JRE/启动器/Info.plist/签名后
+  返回成功，不再显示误导性的 PKG 失败。
 
 Release 只包含补丁文件及允许再分发的运行时，不包含 `desktop-1.0.jar`、游戏
 App、存档、美术、音频或其他游戏本体内容。使用前必须已拥有并安装 Steam 版。
+
+注意：当 macOS 桌面选择“看起来像 1440×900”时，WindowServer 自身仍使用
+2880×1800 合成后缩放到 2560×1600 面板。补丁保证游戏的 OpenGL drawable 不
+超过 2560×1600，并让游戏单位按 2× rasterize；它无法绕过系统合成器的最终重采样。
 
 ## 安装
 
 ### PKG（推荐）
 
 1. 从 [Releases](../../releases) 下载
-   `SlayTheSpire-Modern-macOS-v1.1.1-universal.pkg` 和对应 `.sha256`。
+   `SlayTheSpire-Modern-macOS-v1.2.0-universal.pkg` 和对应 `.sha256`。
 2. 可选：校验下载文件：
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.1.1-universal.pkg.sha256
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.0-universal.pkg.sha256
    ```
 
 3. 打开安装包。PKG 会找到当前登录用户，并以该用户身份修改其 Steam 游戏目录，
@@ -42,7 +51,7 @@ App、存档、美术、音频或其他游戏本体内容。使用前必须已�
 
 ### ZIP 回退包
 
-下载、校验并解压 `SlayTheSpire-Modern-macOS-v1.1.1-universal.zip`，双击
+下载、校验并解压 `SlayTheSpire-Modern-macOS-v1.2.0-universal.zip`，双击
 `Install SlayTheSpire Modern macOS.command`，或在终端执行：
 
 ```bash
@@ -109,7 +118,7 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
 - **原版 jar 不受支持或已修改：** 在 Steam 验证游戏文件。本项目不提供跳过校验
   的参数，避免把字节码补丁应用到未知版本。
 - **发现旧 ARM64 备份：** 先用 v1.0.0 的 `uninstall.sh` 还原并确认原版能启动，
-  再安装 v1.1.1。
+  再安装 v1.2.0。
 - **提示游戏正在运行：** 完全退出游戏后重试。
 - **直接启动崩溃在 `SteamAppsNative_getAppBuildId`：** Steamworks 未初始化，游戏
   随后解引用了空的 `SteamApps` 接口。运行验收应从 Steam 客户端启动；直接执行

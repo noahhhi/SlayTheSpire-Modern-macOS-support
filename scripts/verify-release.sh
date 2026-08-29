@@ -6,8 +6,9 @@ ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT"
 
 required=(
-  VERSION README.md README.zh-CN.md RELEASE_NOTES.md install.sh uninstall.sh
+  VERSION README.md README.zh-CN.md RELEASE_NOTES.md install.sh install-state.sh uninstall.sh
   supported-versions.sha256 payload.sha256 payload/launcher payload/jar-delete.txt
+  payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class
   payload/jre/arm64/bin/java payload/jre/x86_64/bin/java
 )
 for path in "${required[@]}"; do
@@ -18,6 +19,7 @@ for script in install.sh uninstall.sh 'Install SlayTheSpire Modern macOS.command
   [ -x "$script" ] || { echo "not executable: $script" >&2; exit 1; }
   /bin/bash -n "$script"
 done
+/bin/bash -n install-state.sh
 
 [ -z "$(find . \( -name '.DS_Store' -o -name '._*' -o -name '__MACOSX' \) -print -quit)" ] \
   || { echo 'AppleDouble or Finder metadata found' >&2; exit 1; }
@@ -25,8 +27,8 @@ done
   || { echo 'game content found in release tree' >&2; exit 1; }
 
 OVERLAY_CLASS_COUNT="$(find payload/jar -type f -name '*.class' | wc -l | tr -d ' ')"
-[ "$OVERLAY_CLASS_COUNT" -eq 41 ] \
-  || { echo "unexpected Java overlay size: $OVERLAY_CLASS_COUNT classes (expected 41)" >&2; exit 1; }
+[ "$OVERLAY_CLASS_COUNT" -eq 42 ] \
+  || { echo "unexpected Java overlay size: $OVERLAY_CLASS_COUNT classes (expected 42)" >&2; exit 1; }
 
 (shasum -a 256 -c payload.sha256) >/dev/null
 for arch in arm64 x86_64; do
@@ -59,6 +61,8 @@ for arch in arm64 x86_64; do
   for symbol in \
     _Java_org_lwjgl_openal_AL10_initNativeStubs \
     _Java_org_lwjgl_opengl_GL11_nglGetString \
+    _Java_org_lwjgl_opengl_MacOSXDisplay_nGetPhysicalDisplayHeight \
+    _Java_org_lwjgl_opengl_MacOSXDisplay_nGetPhysicalDisplayWidth \
     _Java_org_lwjgl_opengl_MacOSXDisplay_nIsNativeFullscreen \
     _Java_org_lwjgl_opengl_MacOSXDisplay_nUpdateSurfaceBackingScale; do
     grep -q "$symbol" <<< "$SYMBOLS" \

@@ -55,10 +55,13 @@ done
 [ -f "$SCRIPT_DIR/VERSION" ] || fail "VERSION is missing"
 [ -f "$SUPPORTED_HASHES" ] || fail "supported-versions.sha256 is missing"
 [ -f "$PAYLOAD_MANIFEST" ] || fail "payload.sha256 is missing; use a packaged Release asset"
+[ -f "$SCRIPT_DIR/install-state.sh" ] || fail "install-state.sh is missing"
+. "$SCRIPT_DIR/install-state.sh"
 
 log "verifying patch payload..."
 (cd "$SCRIPT_DIR" && shasum -a 256 -c "$(basename "$PAYLOAD_MANIFEST")") >/dev/null \
   || fail "patch payload checksum verification failed; download the Release asset again"
+PAYLOAD_FINGERPRINT="$(shasum -a 256 "$PAYLOAD_MANIFEST" | awk '{print $1}')"
 
 find_app() {
   local candidates=()
@@ -101,9 +104,18 @@ log "found game: $APP"
 [ -d "$RES/jre" ] || fail "the original Resources/jre is missing"
 [ -f "$MACOS_DIR/SlayTheSpire" ] || fail "the original launcher is missing"
 [ -f "$CONTENTS/Info.plist" ] || fail "Info.plist is missing"
-[ ! -e "$BACKUP" ] || fail "the patch is already installed (backup exists at $BACKUP); run uninstall.sh first"
 [ ! -e "$LEGACY_BACKUP" ] || fail "the legacy ARM64 patch is installed; run its uninstall.sh before installing this Universal release"
 [ ! -e "$WORK" ] || fail "stale installer work directory exists: $WORK"
+
+if [ -e "$BACKUP" ]; then
+  if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
+    "$PAYLOAD_MANIFEST" "$PAYLOAD" "$JAR" "$RES" "$MACOS_DIR" "$APP" \
+    "$CONTENTS/Info.plist" "$HOST_ARCH" "$PAYLOAD/jar-delete.txt"; then
+    log "patch $PATCH_VERSION from this exact build is already installed; nothing to do"
+    exit 0
+  fi
+  fail "a patch backup exists, but the installed state does not match this build ($STS_STATE_ERROR). Run uninstall.sh first; the backup was left untouched."
+fi
 
 if /usr/sbin/lsof -t -- "$JAR" >/dev/null 2>&1; then
   fail "the game is running; quit it before installing"
@@ -219,8 +231,6 @@ cp -p "$MACOS_DIR/SlayTheSpire" "$BACKUP/SlayTheSpire"
 cp -p "$CONTENTS/Info.plist" "$BACKUP/Info.plist"
 [ ! -d "$CONTENTS/_CodeSignature" ] || cp -R "$CONTENTS/_CodeSignature" "$BACKUP/_CodeSignature"
 [ ! -f "$CONTENTS/CodeResources" ] || cp -p "$CONTENTS/CodeResources" "$BACKUP/CodeResources"
-printf 'patch-version=%s\noriginal-jar-sha256=%s\n' "$PATCH_VERSION" "$ACTUAL_SHA" > "$BACKUP/install-manifest.txt"
-
 mv "$WORK/staged/jre" "$RES/jre"
 mv "$WORK/staged/desktop-1.0.jar" "$JAR"
 cp -p "$PAYLOAD/launcher" "$MACOS_DIR/SlayTheSpire"
@@ -233,6 +243,10 @@ log "applying an ad-hoc signature..."
 codesign --force --deep -s - "$APP"
 codesign --verify --deep --strict "$APP"
 "$RES/jre/bin/java" -version >/dev/null 2>&1 || fail "installed $HOST_ARCH JRE failed its launch test"
+sts_record_install_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
+  "$ACTUAL_SHA" "$JAR" "$RES/jre" "$MACOS_DIR/SlayTheSpire" \
+  "$CONTENTS/Info.plist" "$WORK/jar-overlay" \
+  || fail "could not record installed build state"
 
 ROLLBACK_NEEDED=0
 log "patch $PATCH_VERSION installed successfully for $HOST_ARCH"
