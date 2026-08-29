@@ -1,4 +1,4 @@
-# v1.1.0 — Universal Retina/fullscreen update
+# v1.1.1 — Fullscreen Retina and PKG reliability fix
 
 ## 中文
 
@@ -6,6 +6,9 @@
   两种架构均使用 Azul Zulu OpenJDK 8.96.0.205 原生 JRE。
 - 窗口、无边框、设置内全屏与绿色按钮统一为支持 Retina 的 macOS 原生 Space
   全屏路径。
+- 修复进入全屏 Space 时 viewport 短暂保留 2880×1800、而物理 drawable 已限制为
+  2560×1600 所造成的裁切与错误分辨率。
+- 修复 PKG 在补丁成功后仍错误返回安装失败的问题；重复安装仍会为保护原版备份而拒绝。
 - Retina drawable 以显示面板的原生物理像素为上限；本机 2560×1600 面板不再
   按系统的 2880×1800 缩放虚拟模式渲染。
 - 窗口现在可自由缩放；UI/输入继续使用逻辑点，OpenGL 与字体使用 Retina backing
@@ -20,7 +23,7 @@
   Intel 逐字节保留官方签名的 Steam API；arm64 bridge 以独立文件名加载 ABI 匹配
   的可再分发 API，避免破坏 Rosetta 签名或混用 SDK。
 
-安装优先下载 `SlayTheSpire-Modern-macOS-v1.1.0-universal.pkg`；若 PKG 无法使用，
+安装优先下载 `SlayTheSpire-Modern-macOS-v1.1.1-universal.pkg`；若 PKG 无法使用，
 下载 ZIP 并双击 `Install SlayTheSpire Modern macOS.command`。卸载运行
 `uninstall.sh`。
 
@@ -30,6 +33,10 @@
   with native Azul Zulu OpenJDK 8.96.0.205 JREs for both architectures.
 - Windowed, borderless, in-game fullscreen, and the green window button share
   the Retina-aware native macOS Space fullscreen path.
+- Fixed fullscreen Space transitions retaining a 2880x1800 viewport after the
+  physical drawable had been capped to 2560x1600.
+- Fixed the PKG reporting failure after a successful patch; repeat installs are
+  still rejected to protect the original backup.
 - Retina drawables are capped to each panel's native physical pixels, avoiding
   a 2880×1800 scaled-mode render surface on a 2560×1600 panel.
 - Windows are freely resizable: UI/input remain in logical points while OpenGL

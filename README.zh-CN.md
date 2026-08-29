@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-这是面向 Steam macOS 版《杀戮尖塔》的社区兼容补丁。v1.1.0 使用同一份
+这是面向 Steam macOS 版《杀戮尖塔》的社区兼容补丁。v1.1.1 使用同一份
 Universal 发布包支持 Intel 与 Apple Silicon Mac，最低系统为 macOS 11。
 
 ## 功能
@@ -26,12 +26,12 @@ App、存档、美术、音频或其他游戏本体内容。使用前必须已�
 ### PKG（推荐）
 
 1. 从 [Releases](../../releases) 下载
-   `SlayTheSpire-Modern-macOS-v1.1.0-universal.pkg` 和对应 `.sha256`。
+   `SlayTheSpire-Modern-macOS-v1.1.1-universal.pkg` 和对应 `.sha256`。
 2. 可选：校验下载文件：
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.1.0-universal.pkg.sha256
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.1.1-universal.pkg.sha256
    ```
 
 3. 打开安装包。PKG 会找到当前登录用户，并以该用户身份修改其 Steam 游戏目录，
@@ -42,7 +42,7 @@ App、存档、美术、音频或其他游戏本体内容。使用前必须已�
 
 ### ZIP 回退包
 
-下载、校验并解压 `SlayTheSpire-Modern-macOS-v1.1.0-universal.zip`，双击
+下载、校验并解压 `SlayTheSpire-Modern-macOS-v1.1.1-universal.zip`，双击
 `Install SlayTheSpire Modern macOS.command`，或在终端执行：
 
 ```bash
@@ -109,7 +109,7 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
 - **原版 jar 不受支持或已修改：** 在 Steam 验证游戏文件。本项目不提供跳过校验
   的参数，避免把字节码补丁应用到未知版本。
 - **发现旧 ARM64 备份：** 先用 v1.0.0 的 `uninstall.sh` 还原并确认原版能启动，
-  再安装 v1.1.0。
+  再安装 v1.1.1。
 - **提示游戏正在运行：** 完全退出游戏后重试。
 - **直接启动崩溃在 `SteamAppsNative_getAppBuildId`：** Steamworks 未初始化，游戏
   随后解引用了空的 `SteamApps` 接口。运行验收应从 Steam 客户端启动；直接执行

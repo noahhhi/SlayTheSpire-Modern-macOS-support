@@ -3,7 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 A community compatibility patch for the Steam macOS release of *Slay the
-Spire*. Version 1.1.0 is one Universal distribution for Intel and Apple
+Spire*. Version 1.1.1 is one Universal distribution for Intel and Apple
 Silicon Macs running macOS 11 or later.
 
 ## Features
@@ -31,13 +31,13 @@ content. You must own and install the Steam version first.
 
 ### PKG (recommended)
 
-1. Download `SlayTheSpire-Modern-macOS-v1.1.0-universal.pkg` and its `.sha256`
+1. Download `SlayTheSpire-Modern-macOS-v1.1.1-universal.pkg` and its `.sha256`
    file from [Releases](../../releases).
 2. Optional integrity check:
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.1.0-universal.pkg.sha256
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.1.1-universal.pkg.sha256
    ```
 
 3. Open the package. It finds the logged-in user's Steam library and runs the
@@ -49,7 +49,7 @@ Gatekeeper globally.
 
 ### ZIP fallback
 
-1. Download and verify `SlayTheSpire-Modern-macOS-v1.1.0-universal.zip`.
+1. Download and verify `SlayTheSpire-Modern-macOS-v1.1.1-universal.zip`.
 2. Extract it and double-click `Install SlayTheSpire Modern macOS.command`, or
    run:
 
@@ -126,7 +126,7 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
   checksum-bypass option because applying bytecode patches to an unknown build
   is unsafe.
 - **Legacy ARM64 backup found:** run the v1.0.0 `uninstall.sh` first, confirm
-  Steam launches the original game, then install v1.1.0.
+  Steam launches the original game, then install v1.1.1.
 - **Game is running:** quit it completely and retry.
 - **Direct launch crashes in `SteamAppsNative_getAppBuildId`:** Steamworks was
   not initialized, so the game's integration dereferenced a null `SteamApps`
