@@ -1,0 +1,16 @@
+#!/bin/bash
+# pkg postinstall: the installer runs as root, but the game lives in the
+# console user's Steam library, so re-run the patch installer as that user.
+DIR=/private/tmp/sts-arm64-install
+CONSOLE_USER="$(stat -f %Su /dev/console 2>/dev/null)"
+rc=0
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ]; then
+  USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+  [ -n "$USER_HOME" ] || USER_HOME="/Users/$CONSOLE_USER"
+  chmod -R a+rX "$DIR" 2>/dev/null
+  sudo -u "$CONSOLE_USER" env HOME="$USER_HOME" "$DIR/install.sh" || rc=$?
+else
+  "$DIR/install.sh" || rc=$?
+fi
+rm -rf "$DIR"
+exit $rc
