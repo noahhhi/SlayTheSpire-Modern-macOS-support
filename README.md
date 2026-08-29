@@ -1,135 +1,152 @@
-# Slay the Spire - Apple Silicon (ARM64) Native Patch
+# Slay the Spire modern macOS support
 
-让 Steam 版《杀戮尖塔》在 Apple Silicon Mac 上原生运行的补丁：去掉 Rosetta，Retina HiDPI 清晰渲染，修复全屏/无边框的诸多问题。
+[简体中文](README.zh-CN.md)
 
-English version below / 英文版见下文。
+A community compatibility patch for the Steam macOS release of *Slay the
+Spire*. Version 1.1.0 is one Universal distribution for Intel and Apple
+Silicon Macs running macOS 11 or later.
 
-## 效果
+## Features
 
-- **原生 ARM64 运行**：内置 Azul Zulu OpenJDK 8 (aarch64) 运行时，LWJGL2 / libGDX / steamworks4j 全部重编为 arm64，不再经过 Rosetta 翻译
-- **Retina HiDPI**：窗口/无边框模式按 2x 物理像素渲染，文字锐利
-- **全屏 = macOS 原生 Space**：可以 Cmd+Tab、四指滑动切换，不再是独占黑屏
-- **全屏分辨率读取物理像素**：内屏最高 2560x1600（而不是浪费性能的 2880x1800 HiDPI 模式），渲染与面板 1:1
-- **无边框窗口正确覆盖菜单栏**，并自动跟随当前桌面逻辑分辨率
-- **设置里切换显示模式立即生效**，无需重启游戏
-- **窗口绿灯全屏按钮可用**
+- Native `x86_64` and `arm64` Azul Zulu OpenJDK 8 runtimes.
+- Retina-aware windowed, borderless, and native macOS Space fullscreen modes.
+- Freely resizable windows with logical-point input and physical-pixel OpenGL
+  viewports/font rasterization. Ratios remain continuously adjustable from 4:3
+  through 21:9; only layout-breaking extremes are clamped (minimum 800×450),
+  and resizing never reconstructs UI or restarts menu audio.
+- One fullscreen behavior for the in-game Fullscreen toggle, Borderless
+  Fullscreen toggle, and the green window button.
+- Automatic Steam library discovery, including additional libraries listed in
+  `libraryfolders.vdf`.
+- Strict original-jar SHA-256 validation, payload checksum verification,
+  exact-file backup, and automatic rollback on installation failure.
 
-## 要求
-
-- Apple Silicon Mac（M1/M2/M3/M4...），macOS 11 或更高
-- Steam 版《Slay the Spire》（未修改过的原版；安装器会校验 `desktop-1.0.jar` 的 SHA-256，Steam 更新游戏后需等待补丁更新，或用 `--force` 强行安装）
-
-## 安装
-
-### 方式 A：pkg 安装包（推荐）
-
-1. 从 [Releases](../../releases) 下载 `SlayTheSpire-ARM64-macOS-v*.pkg`
-2. 双击打开；如果 Gatekeeper 提示未公证，右键 → 打开
-3. 安装器会自动找到 Steam 库中的游戏并完成补丁
-
-### 方式 B：zip + 双击
-
-1. 从 [Releases](../../releases) 下载 `SlayTheSpire-ARM64-macOS-v*.zip` 并解压
-2. 双击 `Install SlayTheSpire ARM64.command`；如果被拦截，在文件夹上右键 → 打开，或先执行 `xattr -dr com.apple.quarantine` 该目录
-3. 也可以在终端里手动执行：`./install.sh`
-
-安装器会自动解析 `~/Library/Application Support/Steam/config/libraryfolders.vdf`，支持自定义 Steam 库位置；也可以手动指定：
-
-```bash
-./install.sh "/path/to/SlayTheSpire.app"
-```
-
-安装过程：备份原始文件（移动到游戏旁的 `SlayTheSpire-ARM64-backup/`，零额外磁盘占用）→ 原地修补 jar（APFS clone，只更新差异条目）→ 安装 ARM64 JRE 与启动器 → ad-hoc 重签名。任何一步失败都会自动回滚。
-
-## 卸载
-
-运行 zip 中的 `uninstall.sh`（或重新下载），会从备份完整还原原版文件。也可以在 Steam 里"验证游戏文件完整性"强制恢复。
-
-## 工作原理
-
-| 部分 | 内容 |
-| --- | --- |
-| `payload/jre/` | Azul Zulu OpenJDK 8 ARM64 运行时 |
-| `payload/jar/` | 793 个 jar 差异条目：JDK8 重编的 LWJGL2/libGDX 类、arm64 natives、显示修复补丁类 |
-| `payload/launcher` | 替换 x86_64 启动器的 bash 脚本，转发 Steam 启动参数 |
-| `payload/jar-delete.txt` | 从 jar 中移除的 5 个 x86 native 条目 |
-
-关键显示修复：全屏不再切换显示模式（Apple Silicon 已禁止软件模式切换），改用 `kCGLCPSurfaceBackingSize` 把 GL drawable 固定在所选物理分辨率，由 WindowServer 合成缩放。
-
-## 故障排查
-
-- 安装日志会直接打印；pkg 安装日志在 `/var/log/install.log`：`grep sts-arm64 /var/log/install.log`
-- 崩溃报告在 `~/Library/Logs/DiagnosticReports/`
-- 游戏更新后校验失败：等待新版补丁，或 `./install.sh --force`（风险自负）
-
-## 声明
-
-本补丁由社区制作，与 MegaCrit 无关。发布内容**不包含任何游戏本体**，仅包含补丁文件，需要你已经拥有 Steam 版游戏。LWJGL / libGDX / steamworks4j 遵循各自开源许可；JRE 为 Azul Zulu OpenJDK（GPLv2 + Classpath Exception）。
-
----
-
-# Slay the Spire - Apple Silicon (ARM64) Native Patch
-
-A community patch that makes the Steam version of Slay the Spire run natively on Apple Silicon Macs: no Rosetta, crisp Retina HiDPI rendering, and proper fullscreen/borderless behavior.
-
-## What you get
-
-- **Native ARM64 runtime**: bundled Azul Zulu OpenJDK 8 (aarch64); LWJGL2, libGDX and steamworks4j rebuilt for arm64 - no Rosetta translation
-- **Retina HiDPI**: windowed/borderless modes render at 2x physical pixels, sharp text
-- **Fullscreen as a native macOS Space**: Cmd+Tab and trackpad gestures work; no more exclusive black-screen mode
-- **Physical-pixel fullscreen resolutions**: up to the panel's native size (e.g. 2560x1600 instead of the wasteful 2880x1800 HiDPI mode), rendering 1:1 with the panel
-- **Borderless window properly covers the menu bar** and always tracks the current desktop size
-- **Display mode changes apply instantly**, no restart required
-- **The green traffic-light fullscreen button works**
-
-## Requirements
-
-- An Apple Silicon Mac running macOS 11 or later
-- The Steam version of Slay the Spire, unmodified (the installer verifies the SHA-256 of `desktop-1.0.jar`; after a Steam update, wait for a patch update or use `--force` at your own risk)
+The release contains patch files and redistributable runtimes only. It does
+not contain `desktop-1.0.jar`, the game app, saves, art, audio, or other game
+content. You must own and install the Steam version first.
 
 ## Install
 
-### Option A: pkg installer (recommended)
+### PKG (recommended)
 
-1. Download `SlayTheSpire-ARM64-macOS-v*.pkg` from [Releases](../../releases)
-2. Open it; if Gatekeeper complains, right-click -> Open
-3. The installer locates the game in your Steam library automatically and applies the patch
+1. Download `SlayTheSpire-Modern-macOS-v1.1.0-universal.pkg` and its `.sha256`
+   file from [Releases](../../releases).
+2. Optional integrity check:
 
-### Option B: zip + double-click
+   ```bash
+   cd ~/Downloads
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.1.0-universal.pkg.sha256
+   ```
 
-1. Download and unzip `SlayTheSpire-ARM64-macOS-v*.zip` from [Releases](../../releases)
-2. Double-click `Install SlayTheSpire ARM64.command`; if blocked, right-click -> Open, or run `xattr -dr com.apple.quarantine` on the folder first
-3. Or run `./install.sh` in a terminal
+3. Open the package. It finds the logged-in user's Steam library and runs the
+   patch as that user, not as root against the game directory.
 
-Custom Steam library locations are detected via `libraryfolders.vdf`; you can also pass the app path explicitly:
+The package is currently ad-hoc/unsigned. If macOS blocks it, open System
+Settings > Privacy & Security and choose **Open Anyway**. Do not disable
+Gatekeeper globally.
+
+### ZIP fallback
+
+1. Download and verify `SlayTheSpire-Modern-macOS-v1.1.0-universal.zip`.
+2. Extract it and double-click `Install SlayTheSpire Modern macOS.command`, or
+   run:
+
+   ```bash
+   ./install.sh
+   ```
+
+For a non-standard location, pass the app explicitly:
 
 ```bash
-./install.sh "/path/to/SlayTheSpire.app"
+./install.sh "/Volumes/Games/SteamLibrary/steamapps/common/SlayTheSpire/SlayTheSpire.app"
 ```
 
-What the installer does: backs up the original files (moved to `SlayTheSpire-ARM64-backup/` next to the game - zero extra disk), patches the jar in place (APFS clone, only changed entries), installs the ARM64 JRE and launcher, and ad-hoc re-signs the app. Any failure triggers an automatic rollback.
+Run a complete read-only preflight with `./install.sh --dry-run`. It validates
+the Release payload, locates the game, checks the original jar, builds a
+candidate patched jar, verifies the selected Zulu JRE, and verifies Universal
+natives without changing the app.
 
-## Uninstall
+## Universal implementation
 
-Run `uninstall.sh` from the zip to restore the original files from the backup. Steam's "Verify integrity of game files" also works.
+The archive bundles matching Azul Zulu 8.96.0.205 JREs for `arm64` and
+`x86_64`; the installer selects the native runtime using `uname -m`.
 
-## How it works
+The payload includes a from-source Universal `liblwjgl.dylib`, because the new
+fullscreen Java code requires matching new JNI implementations on both
+architectures. To avoid redistributing other binaries from the game, the
+remaining patch-native payload carries arm64 slices only. After the original
+Steam jar passes an exact SHA-256 allowlist check, the installer extracts its
+x86_64 libGDX/OpenAL/Steamworks slices and uses the system `/usr/bin/lipo` to
+assemble Universal dylibs in a temporary directory. It never substitutes the
+original unpatched LWJGL slice. Missing tools, patched JNI, or slices fail
+during preflight, before any game file is moved.
 
-| Part | Contents |
-| --- | --- |
-| `payload/jre/` | Azul Zulu OpenJDK 8 ARM64 runtime |
-| `payload/jar/` | 793 jar diff entries: LWJGL2/libGDX classes recompiled with JDK8, arm64 natives, display-fix patch classes |
-| `payload/launcher` | bash script replacing the x86_64 launcher binary, forwarding Steam launch options |
-| `payload/jar-delete.txt` | 5 x86 native entries removed from the jar |
+## Backup, rollback, and uninstall
 
-Key display fix: fullscreen no longer switches display modes (Apple Silicon forbids software mode switching); instead `kCGLCPSurfaceBackingSize` pins the GL drawable to the selected physical resolution and lets the WindowServer composite it.
+Installation preserves the original JRE, jar, launcher, and `Info.plist` in
+`SlayTheSpire-Modern-backup` next to the app. The candidate jar and runtime are
+fully prepared first. Once replacement starts, an `EXIT`/signal handler
+restores the originals if any later step fails.
+
+To revert:
+
+```bash
+./uninstall.sh
+```
+
+The uninstaller restores the exact files and verifies the original jar hash
+before deleting the backup. Steam's **Verify integrity of game files** is an
+additional recovery route.
 
 ## Troubleshooting
 
-- Installer output is printed directly; pkg logs go to `/var/log/install.log`: `grep sts-arm64 /var/log/install.log`
-- Crash reports live in `~/Library/Logs/DiagnosticReports/`
-- Checksum mismatch after a game update: wait for a patch update, or `./install.sh --force` (at your own risk)
+Save a ZIP-installer log:
 
-## Disclaimer
+```bash
+./install.sh 2>&1 | tee ~/Desktop/SlayTheSpire-install.log
+```
 
-This is a community patch, not affiliated with MegaCrit. The release contains **no game content** - patch files only - and requires that you own the game on Steam. LWJGL / libGDX / steamworks4j are under their respective open-source licenses; the JRE is Azul Zulu OpenJDK (GPLv2 + Classpath Exception).
+Save relevant PKG output:
+
+```bash
+grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
+```
+
+- **Unsupported or modified jar:** verify the game in Steam. There is no
+  checksum-bypass option because applying bytecode patches to an unknown build
+  is unsafe.
+- **Legacy ARM64 backup found:** run the v1.0.0 `uninstall.sh` first, confirm
+  Steam launches the original game, then install v1.1.0.
+- **Game is running:** quit it completely and retry.
+- **Custom Steam library not detected:** pass the full `.app` path as shown
+  above.
+- **Crash reports:** see `~/Library/Logs/DiagnosticReports/`.
+
+## Build and release checks
+
+Release maintainers prepare the pinned JREs and build both artifacts with:
+
+```bash
+./scripts/prepare-zulu-jres.sh
+./scripts/prepare-patch-overlay.sh
+./build.sh
+```
+
+Pinned Azul archives:
+
+| Architecture | Archive SHA-256 |
+| --- | --- |
+| arm64 | `1769ea082fa13ba29403363425716451b04b10f5ae6dba07f7f0a69666197f15` |
+| x86_64 | `b2a195c418fe926e5c2032bfd3fb23ed93b1133f50b99cb2c0e47dc618130e5d` |
+
+`build.sh` rejects missing architectures, payload checksum failures,
+AppleDouble metadata, and obvious game-content paths. It emits SHA-256 files
+for the Universal PKG and ZIP. Build formal public assets from a clean checkout
+and do not publish an artifact that fails these gates.
+
+## License and disclaimer
+
+This project is not affiliated with Mega Crit or Valve. LWJGL, libGDX, and
+their components retain their upstream licenses. Azul Zulu OpenJDK is provided
+under GPLv2 with the Classpath Exception; its license files are included in the
+runtime payload.

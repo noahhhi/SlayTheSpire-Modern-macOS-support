@@ -1,36 +1,79 @@
 #!/bin/bash
-# Builds the distributable zip and pkg into dist/.
+# Build and verify the Universal ZIP and component PKG.
 set -euo pipefail
-cd "$(dirname "$0")"
 
-VERSION="$(sed -n 's/^patch-version=//p' payload/version.txt)"
-[ -n "$VERSION" ] || { echo "version.txt missing patch-version"; exit 1; }
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+VERSION="$(tr -d '[:space:]' < VERSION)"
+[ -n "$VERSION" ] || { echo 'VERSION is empty' >&2; exit 1; }
 
-DIST=dist
-STAGE="$DIST/stage"
-rm -rf "$DIST" pkgtmp
-mkdir -p "$STAGE" pkgtmp/root pkgtmp/scripts
+DIST="$ROOT/dist"
+WORK="$(mktemp -d "$ROOT/.release-build.XXXXXX")"
+STAGE="$WORK/stage"
+PKGROOT="$WORK/pkgroot"
+PKGSCRIPTS="$WORK/pkg-scripts"
+PKG_EXPANDED="$WORK/pkg-expanded"
+INSTALL_LOCATION='/Library/Application Support/SlayTheSpire-Modern-Installer'
+trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 
-# zip staging: scripts + docs + payload
-cp install.sh uninstall.sh "Install SlayTheSpire ARM64.command" README.md "$STAGE/"
+[ -x payload/jre/arm64/bin/java ] || { echo 'run scripts/prepare-zulu-jres.sh first' >&2; exit 1; }
+[ -x payload/jre/x86_64/bin/java ] || { echo 'run scripts/prepare-zulu-jres.sh first' >&2; exit 1; }
+[ -d payload/jar ] || { echo 'payload/jar is missing' >&2; exit 1; }
+
+rm -rf "$DIST"
+mkdir -p "$DIST" "$STAGE" "$PKGROOT$INSTALL_LOCATION" "$PKGSCRIPTS"
+cp install.sh uninstall.sh 'Install SlayTheSpire Modern macOS.command' \
+  README.md README.zh-CN.md RELEASE_NOTES.md VERSION supported-versions.sha256 "$STAGE/"
 cp -R payload "$STAGE/payload"
+rm -f "$STAGE/payload/version.txt"
 find "$STAGE" -name '.DS_Store' -delete
-chmod +x "$STAGE/install.sh" "$STAGE/uninstall.sh" "$STAGE/Install SlayTheSpire ARM64.command" "$STAGE/payload/launcher"
-chmod +x "$STAGE/payload/jre/bin/"* 2>/dev/null || true
-find "$STAGE/payload/jre" -name '*.dylib' -exec chmod +x {} + 2>/dev/null || true
-( cd "$STAGE" && zip -q -r -y "../SlayTheSpire-ARM64-macOS-v${VERSION}.zip" . )
+find "$STAGE" -name '._*' -delete
+chmod +x "$STAGE/install.sh" "$STAGE/uninstall.sh" \
+  "$STAGE/Install SlayTheSpire Modern macOS.command" "$STAGE/payload/launcher"
+find "$STAGE/payload/jre" -path '*/bin/*' -type f -exec chmod +x {} +
 
-# pkg: payload lands in /private/tmp/sts-arm64-install, postinstall runs install.sh
-cp -R "$STAGE"/. pkgtmp/root/
-cp pkg-scripts/postinstall pkgtmp/scripts/postinstall
-chmod +x pkgtmp/scripts/postinstall
-pkgbuild --root pkgtmp/root --scripts pkgtmp/scripts \
-  --identifier io.github.noahhhi.slaythespire-arm64 \
-  --version "$VERSION" \
-  --ownership recommended \
-  --install-location /private/tmp/sts-arm64-install \
-  "$DIST/SlayTheSpire-ARM64-macOS-v${VERSION}.pkg"
+(
+  cd "$STAGE"
+  find payload -type f -print | LC_ALL=C sort | while IFS= read -r path; do
+    shasum -a 256 "$path"
+  done > payload.sha256
+)
 
-rm -rf pkgtmp "$STAGE"
-echo "built:"
+"$ROOT/scripts/verify-release.sh" "$STAGE"
+
+ZIP="$DIST/SlayTheSpire-Modern-macOS-v${VERSION}-universal.zip"
+(
+  cd "$STAGE"
+  zip -q -X -r -y "$ZIP" . -x '*.DS_Store' -x '._*' -x '__MACOSX/*'
+)
+unzip -tq "$ZIP" >/dev/null
+unzip -Z1 "$ZIP" | grep -Eq '(^|/)(desktop-1\.0\.jar|SlayTheSpire\.app)(/|$)' \
+  && { echo 'game content found in ZIP' >&2; exit 1; } || true
+unzip -Z1 "$ZIP" | grep -Eq '(^|/)(\._|__MACOSX)' \
+  && { echo 'AppleDouble content found in ZIP' >&2; exit 1; } || true
+
+cp -R "$STAGE/." "$PKGROOT$INSTALL_LOCATION/"
+# pkgbuild normalizes metadata while archiving. Give the temporary package
+# root owner write access so read-only files inside the upstream JRE do not
+# produce misleading "write: Permission denied" diagnostics.
+chmod -R u+w "$PKGROOT"
+cp pkg-scripts/postinstall "$PKGSCRIPTS/postinstall"
+chmod +x "$PKGSCRIPTS/postinstall"
+PKG="$DIST/SlayTheSpire-Modern-macOS-v${VERSION}-universal.pkg"
+pkgbuild --root "$PKGROOT" --scripts "$PKGSCRIPTS" \
+  --component-plist packaging/components.plist \
+  --identifier io.github.noahhhi.slaythespire-modern \
+  --version "$VERSION" --ownership recommended --install-location / "$PKG"
+
+pkgutil --expand "$PKG" "$PKG_EXPANDED"
+[ -z "$(find "$PKG_EXPANDED" \( -name '._*' -o -name '.DS_Store' \) -print -quit)" ] \
+  || { echo 'AppleDouble content found in PKG' >&2; exit 1; }
+pkgutil --payload-files "$PKG" | grep -Eq '(^|/)(desktop-1\.0\.jar|SlayTheSpire\.app)(/|$)' \
+  && { echo 'game content found in PKG' >&2; exit 1; } || true
+
+for artifact in "$PKG" "$ZIP"; do
+  (cd "$DIST" && shasum -a 256 "$(basename "$artifact")" > "$(basename "$artifact").sha256")
+done
+
+echo 'Built and verified:'
 ls -lh "$DIST"

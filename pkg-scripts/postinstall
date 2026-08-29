@@ -1,16 +1,33 @@
 #!/bin/bash
-# pkg postinstall: the installer runs as root, but the game lives in the
-# console user's Steam library, so re-run the patch installer as that user.
-DIR=/private/tmp/sts-arm64-install
-CONSOLE_USER="$(stat -f %Su /dev/console 2>/dev/null)"
-rc=0
-if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ]; then
-  USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
-  [ -n "$USER_HOME" ] || USER_HOME="/Users/$CONSOLE_USER"
-  chmod -R a+rX "$DIR" 2>/dev/null
-  sudo -u "$CONSOLE_USER" env HOME="$USER_HOME" "$DIR/install.sh" || rc=$?
-else
-  "$DIR/install.sh" || rc=$?
-fi
-rm -rf "$DIR"
-exit $rc
+# Run the patch as the logged-in desktop user, never as root against their
+# Steam library. Installer files are removed on both success and failure.
+set -u
+
+DIR='/Library/Application Support/SlayTheSpire-Modern-Installer'
+cleanup() { rm -rf "$DIR"; }
+trap cleanup EXIT
+
+[ -d "$DIR" ] && [ ! -L "$DIR" ] || {
+  echo '[sts-modern] invalid or missing package payload directory' >&2
+  exit 1
+}
+
+CONSOLE_USER="$(stat -f %Su /dev/console 2>/dev/null || true)"
+case "$CONSOLE_USER" in
+  ''|root|loginwindow)
+    echo '[sts-modern] no logged-in desktop user; sign in and run the package again' >&2
+    exit 1
+    ;;
+esac
+
+USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+[ -n "$USER_HOME" ] || {
+  echo '[sts-modern] could not determine the console user home directory' >&2
+  exit 1
+}
+USER_UID="$(id -u "$CONSOLE_USER")" || exit 1
+
+chmod -R a+rX "$DIR"
+launchctl asuser "$USER_UID" sudo -u "$CONSOLE_USER" \
+  env HOME="$USER_HOME" USER="$CONSOLE_USER" LOGNAME="$CONSOLE_USER" \
+  "$DIR/install.sh"
