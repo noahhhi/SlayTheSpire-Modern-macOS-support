@@ -48,10 +48,9 @@ codesign --verify --strict "$OVERLAY/liblwjgl.dylib"
 printf '%s\r\n' "$(shasum -a 1 "$OVERLAY/liblwjgl.dylib" | awk '{print $1}')" > "$OVERLAY/liblwjgl.dylib.sha1"
 rm -f "$OVERLAY/libsteam_api.dylib" "$OVERLAY/libsteam_api.dylib.sha1"
 
-# Rosetta must keep the original signed libsteam_api.dylib byte-for-byte, but
-# the migrated arm64 steamworks4j bridge uses a newer Steam API ABI. Ship that
-# redistributable under an arm-only name so the patched SteamAPI Java loader
-# can select it without replacing or re-signing the original Intel library.
+# The migrated arm64 steamworks4j bridge uses a newer Steam API ABI. Ship that
+# redistributable under an arm-only name so the installer can pair it with the
+# arm64 bridge without redistributing the game's original Steam API.
 /usr/bin/lipo -extract arm64 "$ARM_STEAM_API" -output "$OVERLAY/libsteam_api_arm64.dylib"
 install_name_tool -id @loader_path/libsteam_api_arm64.dylib "$OVERLAY/libsteam_api_arm64.dylib"
 codesign --force -s - "$OVERLAY/libsteam_api_arm64.dylib"

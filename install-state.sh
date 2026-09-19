@@ -31,6 +31,98 @@ sts_checksum_value() {
   return 1
 }
 
+# Validate an already installed build against the state recorded beside its
+# original-file backup. This is intentionally independent of the incoming
+# release payload so a verified older build can be upgraded safely.
+sts_verify_recorded_install_state() {
+  local backup="$1"
+  local jar="$2"
+  local resources="$3"
+  local macos_dir="$4"
+  local installed_info="$5"
+  local host_arch="$6"
+  local manifest="$backup/install-manifest.txt"
+  local expected actual path entry line
+  local recorded_jre_files=0
+  local actual_jre_files=0
+
+  STS_STATE_ERROR=''
+  [ -d "$backup" ] && [ ! -L "$backup" ] \
+    || sts_state_error 'backup path is missing, invalid, or a symlink' || return 1
+  for path in "$manifest" "$backup/installed-jre.sha256" "$backup/installed-overlay.sha256" \
+    "$backup/desktop-1.0.jar" "$backup/jre" "$backup/SlayTheSpire" "$backup/Info.plist"; do
+    [ -e "$path" ] || sts_state_error "backup is incomplete: $(basename "$path") is missing" || return 1
+  done
+
+  expected="$(sts_manifest_value original-jar-sha256 "$manifest")"
+  actual="$(shasum -a 256 "$backup/desktop-1.0.jar" | awk '{print $1}')" || return 1
+  [ -n "$expected" ] && [ "$actual" = "$expected" ] \
+    || sts_state_error 'preserved original jar does not match its recorded hash' || return 1
+
+  [ -f "$macos_dir/SlayTheSpire" ] && [ -x "$macos_dir/SlayTheSpire" ] \
+    || sts_state_error 'installed launcher differs' || return 1
+  : "$host_arch" # Older verified builds may legitimately use a script/fat launcher.
+  expected="$(sts_manifest_value installed-launcher-sha256 "$manifest")"
+  actual="$(shasum -a 256 "$macos_dir/SlayTheSpire" | awk '{print $1}')" || return 1
+  [ -n "$expected" ] && [ "$actual" = "$expected" ] \
+    || sts_state_error 'installed launcher does not match its recorded hash' || return 1
+
+  [ -f "$installed_info" ] || sts_state_error 'installed Info.plist is missing' || return 1
+  expected="$(sts_manifest_value installed-info-plist-sha256 "$manifest")"
+  actual="$(shasum -a 256 "$installed_info" | awk '{print $1}')" || return 1
+  [ -n "$expected" ] && [ "$actual" = "$expected" ] \
+    || sts_state_error 'installed Info.plist differs from the completed install' || return 1
+
+  [ -d "$resources/jre" ] && [ -x "$resources/jre/bin/java" ] \
+    || sts_state_error 'installed JRE is missing or not executable' || return 1
+  "$resources/jre/bin/java" -version >/dev/null 2>&1 \
+    || sts_state_error 'installed JRE launch test failed' || return 1
+  while IFS= read -r line; do
+    expected="${line%% *}"
+    path="${line#* }"
+    path="${path# }"
+    case "$path" in
+      ./*) ;;
+      *) sts_state_error 'installed JRE state contains an invalid path'; return 1 ;;
+    esac
+    case "$path" in
+      *'/../'*|../*|*/..) sts_state_error 'installed JRE state escapes its directory'; return 1 ;;
+    esac
+    [ -f "$resources/jre/${path#./}" ] \
+      || sts_state_error "installed JRE file is missing: ${path#./}" || return 1
+    actual="$(shasum -a 256 "$resources/jre/${path#./}" | awk '{print $1}')" || return 1
+    [ "$actual" = "$expected" ] \
+      || sts_state_error "installed JRE file differs: ${path#./}" || return 1
+    recorded_jre_files=$((recorded_jre_files + 1))
+  done < "$backup/installed-jre.sha256"
+  actual_jre_files="$(find "$resources/jre" -type f | wc -l | tr -d ' ')"
+  [ "$recorded_jre_files" -gt 0 ] && [ "$actual_jre_files" -eq "$recorded_jre_files" ] \
+    || sts_state_error 'installed JRE file set differs' || return 1
+
+  [ -f "$jar" ] && unzip -tq "$jar" >/dev/null \
+    || sts_state_error 'installed jar is missing or corrupt' || return 1
+  expected="$(sts_manifest_value installed-jar-sha256 "$manifest")"
+  actual="$(shasum -a 256 "$jar" | awk '{print $1}')" || return 1
+  [ -n "$expected" ] && [ "$actual" = "$expected" ] \
+    || sts_state_error 'installed jar differs' || return 1
+
+  while IFS= read -r line; do
+    expected="${line%% *}"
+    entry="${line#* }"
+    entry="${entry# }"
+    [ "$entry" != "$line" ] \
+      || sts_state_error 'installed overlay manifest contains a malformed entry' || return 1
+    entry="${entry#./}"
+    case "$entry" in
+      *'../'*|../*|*/..) sts_state_error 'installed overlay state contains an invalid path'; return 1 ;;
+    esac
+    actual="$(unzip -p "$jar" "$entry" | shasum -a 256 | awk '{print $1}')" \
+      || { sts_state_error "installed overlay entry is missing: $entry"; return 1; }
+    [ "$actual" = "$expected" ] \
+      || sts_state_error "installed overlay entry differs: $entry" || return 1
+  done < "$backup/installed-overlay.sha256"
+}
+
 sts_record_install_state() {
   local backup="$1"
   local patch_version="$2"
@@ -41,27 +133,29 @@ sts_record_install_state() {
   local installed_launcher="$7"
   local installed_info="$8"
   local overlay_dir="$9"
+  local state_dir="${10:-$backup}"
   local installed_jar_sha installed_launcher_sha installed_info_sha
 
+  mkdir -p "$state_dir" || return 1
   installed_jar_sha="$(shasum -a 256 "$installed_jar" | awk '{print $1}')" || return 1
   installed_launcher_sha="$(shasum -a 256 "$installed_launcher" | awk '{print $1}')" || return 1
   installed_info_sha="$(shasum -a 256 "$installed_info" | awk '{print $1}')" || return 1
   printf 'patch-version=%s\npayload-manifest-sha256=%s\noriginal-jar-sha256=%s\ninstalled-jar-sha256=%s\ninstalled-launcher-sha256=%s\ninstalled-info-plist-sha256=%s\n' \
     "$patch_version" "$payload_fingerprint" "$original_jar_sha" "$installed_jar_sha" \
     "$installed_launcher_sha" "$installed_info_sha" \
-    > "$backup/install-manifest.txt"
+    > "$state_dir/install-manifest.txt"
   (
     cd "$installed_jre" || exit 1
     find . -type f -print | LC_ALL=C sort | while IFS= read -r entry; do
       shasum -a 256 "$entry"
     done
-  ) > "$backup/installed-jre.sha256"
+  ) > "$state_dir/installed-jre.sha256"
   (
     cd "$overlay_dir" || exit 1
     find . -type f -print | LC_ALL=C sort | while IFS= read -r entry; do
       shasum -a 256 "$entry"
     done
-  ) > "$backup/installed-overlay.sha256"
+  ) > "$state_dir/installed-overlay.sha256"
 }
 
 sts_verify_installed_state() {
@@ -78,7 +172,7 @@ sts_verify_installed_state() {
   local host_arch="${11}"
   local jar_delete="${12}"
   local manifest="$backup/install-manifest.txt"
-  local expected actual path rel entry line
+  local expected actual path rel entry line launcher_archs
   local expected_jre_files=0
   local recorded_jre_files=0
   local actual_jre_files=0
@@ -102,8 +196,10 @@ sts_verify_installed_state() {
     || sts_state_error 'preserved original jar does not match its recorded hash' || return 1
 
   [ -f "$macos_dir/SlayTheSpire" ] && [ -x "$macos_dir/SlayTheSpire" ] \
-    && cmp -s "$payload/launcher" "$macos_dir/SlayTheSpire" \
     || sts_state_error 'installed launcher differs' || return 1
+  launcher_archs="$(/usr/bin/lipo -archs "$macos_dir/SlayTheSpire" 2>/dev/null || true)"
+  [ "$launcher_archs" = "$host_arch" ] \
+    || sts_state_error "installed launcher is not native-only $host_arch" || return 1
   expected="$(sts_manifest_value installed-launcher-sha256 "$manifest")"
   actual="$(shasum -a 256 "$macos_dir/SlayTheSpire" | awk '{print $1}')" || return 1
   [ -n "$expected" ] && [ "$actual" = "$expected" ] \

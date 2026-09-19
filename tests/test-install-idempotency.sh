@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/install-state.sh"
 PATCH_VERSION="$(tr -d '\r\n' < "$ROOT/VERSION")"
+HOST_ARCH="$(uname -m)"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/sts-install-state-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 
@@ -18,19 +19,20 @@ DISPLAY_CONFIG="$RES/info.displayconfig"
 BACKUP="$WORK/SlayTheSpire-Modern-backup"
 OVERLAY="$WORK/overlay"
 ORIGINAL_ROOT="$WORK/original-jar"
-mkdir -p "$PAYLOAD/jre/arm64/bin" "$RES/jre/bin" "$MACOS_DIR" \
+mkdir -p "$PAYLOAD/jre/$HOST_ARCH/bin" "$RES/jre/bin" "$MACOS_DIR" \
   "$BACKUP/jre" "$OVERLAY/patch" "$ORIGINAL_ROOT"
 
 printf '#!/bin/bash\n[ "${1:-}" = "-version" ] || exit 2\nprintf "run\\n" >> "${STS_TEST_JAVA_LOG:?}"\n' \
-  > "$PAYLOAD/jre/arm64/bin/java"
-printf '#!/bin/bash\nexit 0\n' > "$PAYLOAD/launcher"
+  > "$PAYLOAD/jre/$HOST_ARCH/bin/java"
+"$ROOT/scripts/prepare-native-launcher.sh" "$PAYLOAD/launcher" >/dev/null
 printf 'patched-class\n' > "$OVERLAY/patch/Example.class"
 printf 'base\n' > "$ORIGINAL_ROOT/base.txt"
 printf 'delete-me\n' > "$ORIGINAL_ROOT/remove.me"
 printf 'remove.me\n' > "$PAYLOAD/jar-delete.txt"
-chmod +x "$PAYLOAD/launcher" "$PAYLOAD/jre/arm64/bin/java"
-cp "$PAYLOAD/jre/arm64/bin/java" "$RES/jre/bin/java"
-cp "$PAYLOAD/launcher" "$MACOS_DIR/SlayTheSpire"
+chmod +x "$PAYLOAD/jre/$HOST_ARCH/bin/java"
+cp "$PAYLOAD/jre/$HOST_ARCH/bin/java" "$RES/jre/bin/java"
+/usr/bin/lipo -extract "$HOST_ARCH" "$PAYLOAD/launcher" -output "$MACOS_DIR/SlayTheSpire"
+chmod +x "$MACOS_DIR/SlayTheSpire"
 printf '%s\n' \
   '<?xml version="1.0" encoding="UTF-8"?>' \
   '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
@@ -76,14 +78,19 @@ echo 'first install: state recorded successfully'
 
 sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
-  "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"
+  "$MACOS_DIR" "$APP" "$INFO" "$HOST_ARCH" "$PAYLOAD/jar-delete.txt"
 [ "$(wc -l < "$STS_TEST_JAVA_LOG" | tr -d ' ')" -eq 1 ]
 echo 'same build repeat: accepted as already installed'
+
+sts_verify_recorded_install_state "$BACKUP" "$RES/desktop-1.0.jar" "$RES" \
+  "$MACOS_DIR" "$INFO" "$HOST_ARCH"
+[ "$(wc -l < "$STS_TEST_JAVA_LOG" | tr -d ' ')" -eq 2 ]
+echo 'recorded prior build: accepted for a verified upgrade'
 
 if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" \
   'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
-  "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"; then
+  "$MACOS_DIR" "$APP" "$INFO" "$HOST_ARCH" "$PAYLOAD/jar-delete.txt"; then
   echo 'different build was incorrectly accepted' >&2
   exit 1
 fi
@@ -93,14 +100,14 @@ echo 'same version different build: safely refused'
 printf '1280\n800\n60\ntrue\nfalse\ntrue\n' > "$DISPLAY_CONFIG"
 sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
-  "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"
+  "$MACOS_DIR" "$APP" "$INFO" "$HOST_ARCH" "$PAYLOAD/jar-delete.txt"
 echo 'mutable game display config: accepted after launch'
 
 cp "$INFO" "$WORK/installed-Info.plist"
 printf '<!-- tampered -->\n' >> "$INFO"
 if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
-  "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"; then
+  "$MACOS_DIR" "$APP" "$INFO" "$HOST_ARCH" "$PAYLOAD/jar-delete.txt"; then
   echo 'tampered Info.plist was incorrectly accepted' >&2
   exit 1
 fi
@@ -111,7 +118,7 @@ cp "$WORK/installed-Info.plist" "$INFO"
 rm "$MACOS_DIR/SlayTheSpire"
 if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \
-  "$MACOS_DIR" "$APP" "$INFO" arm64 "$PAYLOAD/jar-delete.txt"; then
+  "$MACOS_DIR" "$APP" "$INFO" "$HOST_ARCH" "$PAYLOAD/jar-delete.txt"; then
   echo 'partial install was incorrectly accepted' >&2
   exit 1
 fi

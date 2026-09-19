@@ -36,18 +36,27 @@ LC_ALL=C grep -a -q 'fitViewport' "$GEOMETRY_CLASS" \
   || { echo 'safe fitted-viewport helper is missing from the GDX overlay' >&2; exit 1; }
 if LC_ALL=C grep -a -q 'capLogicalSize' "$GEOMETRY_CLASS" \
   || LC_ALL=C grep -a -q 'getPhysicalDisplayWidth\|getPhysicalDisplayHeight' "$GRAPHICS_CLASS"; then
-  echo 'stale physical-panel Retina cap found in the GDX overlay; v1.2.1 requires full 2x backing' >&2
+  echo 'stale physical-panel Retina cap found in the GDX overlay; full 2x backing is required' >&2
   exit 1
 fi
 
 (shasum -a 256 -c payload.sha256) >/dev/null
+LAUNCHER_ARCHS="$(/usr/bin/lipo -archs payload/launcher 2>/dev/null || true)"
+case " $LAUNCHER_ARCHS " in *' arm64 '*) ;; *) echo 'native launcher lacks arm64' >&2; exit 1 ;; esac
+case " $LAUNCHER_ARCHS " in *' x86_64 '*) ;; *) echo 'native launcher lacks x86_64' >&2; exit 1 ;; esac
+file payload/launcher | grep -q 'Mach-O universal binary' \
+  || { echo 'Steam entry point must be a Universal Mach-O binary, not a shell script' >&2; exit 1; }
+LAUNCHER_MINOS="$(otool -l payload/launcher | awk '$1 == "minos" { print $2 }' | sort -u)"
+[ "$LAUNCHER_MINOS" = '11.0' ] \
+  || { echo "native launcher deployment target must be macOS 11.0 (found: $LAUNCHER_MINOS)" >&2; exit 1; }
 for arch in arm64 x86_64; do
   archs="$(/usr/bin/lipo -archs "payload/jre/$arch/bin/java")"
   case " $archs " in *" $arch "*) ;; *) echo "JRE architecture mismatch: $archs" >&2; exit 1 ;; esac
 done
 
 arm_natives=(
-  libgdx-controllers-desktop64.dylib libgdx-freetype64.dylib libgdx64.dylib
+  libgdx-controllers-desktop.dylib libgdx-controllers-desktop64.dylib
+  libgdx-freetype.dylib libgdx-freetype64.dylib libgdx.dylib libgdx64.dylib
   liblwjgl.dylib libsteam_api_arm64.dylib libsteamworks4j.dylib openal.dylib
 )
 for native in "${arm_natives[@]}"; do
@@ -57,6 +66,12 @@ for native in "${arm_natives[@]}"; do
   if [ "$native" != liblwjgl.dylib ]; then
     case " $archs " in *" x86_64 "*) echo "$native must not ship an x86_64 slice; installer uses the verified original" >&2; exit 1 ;; esac
   fi
+done
+
+for native_path in payload/jar/*.dylib; do
+  native_minos="$(otool -l "$native_path" | awk '$1 == "minos" { print $2 }' | sort -u)"
+  [ "$native_minos" = '11.0' ] \
+    || { echo "$(basename "$native_path") deployment target must be macOS 11.0 (found: $native_minos)" >&2; exit 1; }
 done
 
 LWJGL_ARCHS="$(/usr/bin/lipo -archs payload/jar/liblwjgl.dylib)"

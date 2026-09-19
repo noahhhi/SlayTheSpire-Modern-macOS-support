@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PAYLOAD="$SCRIPT_DIR/payload"
 SUPPORTED_HASHES="$SCRIPT_DIR/supported-versions.sha256"
+SUPPORTED_UPGRADES="$SCRIPT_DIR/supported-upgrades.sha256"
 PAYLOAD_MANIFEST="$SCRIPT_DIR/payload.sha256"
 APP_ARG=""
 DRY_RUN=0
@@ -35,6 +36,11 @@ fail() { printf '[sts-modern] ERROR: %s\n' "$*" >&2; exit 1; }
 
 [ "$(uname -s)" = "Darwin" ] || fail "this patch only supports macOS"
 HOST_ARCH="$(uname -m)"
+# Release verification may exercise the non-host branch without executing its
+# binaries. The override is deliberately restricted to a no-write dry run.
+if [ "$DRY_RUN" = 1 ] && [ -n "${STS_TEST_HOST_ARCH:-}" ]; then
+  HOST_ARCH="$STS_TEST_HOST_ARCH"
+fi
 case "$HOST_ARCH" in
   arm64|x86_64) ;;
   *) fail "unsupported Mac architecture: $HOST_ARCH" ;;
@@ -54,6 +60,7 @@ done
 [ -f "$PAYLOAD/jar-delete.txt" ] || fail "payload/jar-delete.txt is missing"
 [ -f "$SCRIPT_DIR/VERSION" ] || fail "VERSION is missing"
 [ -f "$SUPPORTED_HASHES" ] || fail "supported-versions.sha256 is missing"
+[ -f "$SUPPORTED_UPGRADES" ] || fail "supported-upgrades.sha256 is missing"
 [ -f "$PAYLOAD_MANIFEST" ] || fail "payload.sha256 is missing; use a packaged Release asset"
 [ -f "$SCRIPT_DIR/install-state.sh" ] || fail "install-state.sh is missing"
 . "$SCRIPT_DIR/install-state.sh"
@@ -98,6 +105,8 @@ BACKUP="$GAME_DIR/SlayTheSpire-Modern-backup"
 LEGACY_BACKUP="$GAME_DIR/SlayTheSpire-ARM64-backup"
 WORK="$GAME_DIR/.SlayTheSpire-Modern-install.$$"
 PATCH_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/VERSION")"
+INSTALL_MODE=fresh
+SOURCE_JAR="$JAR"
 
 log "found game: $APP"
 [ -f "$JAR" ] || fail "desktop-1.0.jar is missing; this is not the supported Steam app"
@@ -114,15 +123,27 @@ if [ -e "$BACKUP" ]; then
     log "patch $PATCH_VERSION from this exact build is already installed; nothing to do"
     exit 0
   fi
-  fail "a patch backup exists, but the installed state does not match this build ($STS_STATE_ERROR). Run uninstall.sh first; the backup was left untouched."
+  PRIOR_VERSION="$(sts_manifest_value patch-version "$BACKUP/install-manifest.txt" 2>/dev/null || true)"
+  PRIOR_FINGERPRINT="$(sts_manifest_value payload-manifest-sha256 "$BACKUP/install-manifest.txt" 2>/dev/null || true)"
+  if ! awk -v version="$PRIOR_VERSION" -v fingerprint="$PRIOR_FINGERPRINT" \
+    '$1 == fingerprint && $2 == version { found=1 } END { exit !found }' "$SUPPORTED_UPGRADES"; then
+    fail "a different or unknown patch build is installed. Run its uninstall.sh first; the original backup was left untouched."
+  fi
+  if ! sts_verify_recorded_install_state "$BACKUP" "$JAR" "$RES" "$MACOS_DIR" \
+    "$CONTENTS/Info.plist" "$HOST_ARCH"; then
+    fail "the existing $PRIOR_VERSION patch cannot be upgraded safely ($STS_STATE_ERROR). Run its uninstall.sh first; the original backup was left untouched."
+  fi
+  INSTALL_MODE=upgrade
+  SOURCE_JAR="$BACKUP/desktop-1.0.jar"
+  log "verified installed patch $PRIOR_VERSION; preparing an in-place upgrade to $PATCH_VERSION"
 fi
 
 if /usr/sbin/lsof -t -- "$JAR" >/dev/null 2>&1; then
   fail "the game is running; quit it before installing"
 fi
 
-log "verifying the unmodified Steam jar..."
-ACTUAL_SHA="$(shasum -a 256 "$JAR" | awk '{print $1}')"
+log "verifying the preserved unmodified Steam jar..."
+ACTUAL_SHA="$(shasum -a 256 "$SOURCE_JAR" | awk '{print $1}')"
 if ! awk -v hash="$ACTUAL_SHA" '$1 == hash { found=1 } END { exit !found }' "$SUPPORTED_HASHES"; then
   fail "unsupported or modified desktop-1.0.jar (sha256: $ACTUAL_SHA). Use Steam > Properties > Installed Files > Verify integrity, then retry."
 fi
@@ -133,16 +154,31 @@ cleanup() {
   trap - EXIT INT TERM HUP
   set +e
   if [ "$ROLLBACK_NEEDED" = "1" ]; then
-    log "installation did not complete; restoring the original files..."
-    [ -e "$BACKUP/jre" ] && { rm -rf "$RES/jre"; mv "$BACKUP/jre" "$RES/jre"; }
-    [ -e "$BACKUP/desktop-1.0.jar" ] && { rm -f "$JAR"; mv "$BACKUP/desktop-1.0.jar" "$JAR"; }
-    [ -f "$BACKUP/SlayTheSpire" ] && cp -p "$BACKUP/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
-    [ -f "$BACKUP/Info.plist" ] && cp -p "$BACKUP/Info.plist" "$CONTENTS/Info.plist"
-    rm -rf "$CONTENTS/_CodeSignature"
-    rm -f "$CONTENTS/CodeResources"
-    [ -d "$BACKUP/_CodeSignature" ] && cp -R "$BACKUP/_CodeSignature" "$CONTENTS/_CodeSignature"
-    [ -f "$BACKUP/CodeResources" ] && cp -p "$BACKUP/CodeResources" "$CONTENTS/CodeResources"
-    rm -rf "$BACKUP"
+    if [ "$INSTALL_MODE" = upgrade ]; then
+      log "upgrade did not complete; restoring the previously installed patch..."
+      [ -e "$WORK/previous/jre" ] && { rm -rf "$RES/jre"; mv "$WORK/previous/jre" "$RES/jre"; }
+      [ -e "$WORK/previous/desktop-1.0.jar" ] && { rm -f "$JAR"; mv "$WORK/previous/desktop-1.0.jar" "$JAR"; }
+      [ -f "$WORK/previous/SlayTheSpire" ] && cp -p "$WORK/previous/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
+      [ -f "$WORK/previous/Info.plist" ] && cp -p "$WORK/previous/Info.plist" "$CONTENTS/Info.plist"
+      rm -rf "$CONTENTS/_CodeSignature"
+      rm -f "$CONTENTS/CodeResources"
+      [ -d "$WORK/previous/_CodeSignature" ] && cp -R "$WORK/previous/_CodeSignature" "$CONTENTS/_CodeSignature"
+      [ -f "$WORK/previous/CodeResources" ] && cp -p "$WORK/previous/CodeResources" "$CONTENTS/CodeResources"
+      for state_file in install-manifest.txt installed-jre.sha256 installed-overlay.sha256; do
+        [ -f "$WORK/previous/$state_file" ] && cp -p "$WORK/previous/$state_file" "$BACKUP/$state_file"
+      done
+    else
+      log "installation did not complete; restoring the original files..."
+      [ -e "$BACKUP/jre" ] && { rm -rf "$RES/jre"; mv "$BACKUP/jre" "$RES/jre"; }
+      [ -e "$BACKUP/desktop-1.0.jar" ] && { rm -f "$JAR"; mv "$BACKUP/desktop-1.0.jar" "$JAR"; }
+      [ -f "$BACKUP/SlayTheSpire" ] && cp -p "$BACKUP/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
+      [ -f "$BACKUP/Info.plist" ] && cp -p "$BACKUP/Info.plist" "$CONTENTS/Info.plist"
+      rm -rf "$CONTENTS/_CodeSignature"
+      rm -f "$CONTENTS/CodeResources"
+      [ -d "$BACKUP/_CodeSignature" ] && cp -R "$BACKUP/_CodeSignature" "$CONTENTS/_CodeSignature"
+      [ -f "$BACKUP/CodeResources" ] && cp -p "$BACKUP/CodeResources" "$CONTENTS/CodeResources"
+      rm -rf "$BACKUP"
+    fi
   fi
   rm -rf "$WORK"
   exit "$rc"
@@ -152,55 +188,103 @@ trap cleanup EXIT INT TERM HUP
 mkdir -p "$WORK/jar-overlay" "$WORK/original-natives" "$WORK/staged"
 cp -R "$PAYLOAD/jar/." "$WORK/jar-overlay/"
 
-# The verified Steam jar already ships a signed i386/x86_64/arm64 Steam API.
-# Preserve those exact bytes and its hardened-runtime signature. Replacing it
-# with a locally thinned/ad-hoc copy breaks Rosetta's AOT signature supplement.
+# The verified Steam jar supplies its Steam API locally; the public patch does
+# not redistribute that game binary.
 rm -f "$WORK/jar-overlay/libsteam_api.dylib" "$WORK/jar-overlay/libsteam_api.dylib.sha1"
 
-# Public release assets contain only patch-native arm64 slices. The x86_64
-# slices are taken from this user's hash-verified Steam jar and combined into
-# Universal binaries locally, so no original game binary is redistributed.
-UNIVERSAL_NATIVES=(
-  libgdx-controllers-desktop64.dylib
-  libgdx-freetype64.dylib
-  libgdx64.dylib
-  liblwjgl.dylib
-  libsteamworks4j.dylib
-  openal.dylib
-)
-log "assembling Universal LWJGL/libGDX natives from patch + verified original slices..."
-for native in "${UNIVERSAL_NATIVES[@]}"; do
+# One Release supports both Mac families, but the installed runtime must be
+# host-native only. In particular, this game's Steam metadata prefers x86_64
+# whenever that slice exists, which prevents launch on an arm64 Mac without
+# Rosetta. Patch-built arm64 code comes from the payload; x86_64 code comes
+# from the user's hash-verified original, except for the patched LWJGL slice.
+if [ "$HOST_ARCH" = arm64 ]; then
+  ARCH_NATIVE_FILES=(
+    libgdx-controllers-desktop.dylib
+    libgdx-controllers-desktop64.dylib
+    libgdx-freetype.dylib
+    libgdx-freetype64.dylib
+    libgdx.dylib
+    libgdx64.dylib
+    liblwjgl.dylib
+    libsteamworks4j.dylib
+    openal.dylib
+  )
+  HOST_DELETE_ENTRIES=()
+else
+  # The unsuffixed libGDX natives in the original Steam jar are i386-only.
+  # macOS 11 cannot run them, and keeping them would violate the x86_64-only
+  # installed-runtime guarantee. The 64-bit JVM loads the *64 variants.
+  ARCH_NATIVE_FILES=(
+    libgdx-controllers-desktop64.dylib
+    libgdx-freetype64.dylib
+    libgdx64.dylib
+    liblwjgl.dylib
+    libsteamworks4j.dylib
+    openal.dylib
+  )
+  HOST_DELETE_ENTRIES=(
+    libgdx-controllers-desktop.dylib
+    libgdx-controllers-desktop.dylib.sha1
+    libgdx-freetype.dylib
+    libgdx-freetype.dylib.sha1
+    libgdx.dylib
+    libgdx.dylib.sha1
+  )
+  rm -f "${HOST_DELETE_ENTRIES[@]/#/$WORK/jar-overlay/}"
+fi
+log "assembling host-native $HOST_ARCH LWJGL/libGDX/OpenAL/Steamworks files..."
+for native in "${ARCH_NATIVE_FILES[@]}"; do
   patched="$WORK/jar-overlay/$native"
   [ -f "$patched" ] || fail "patch native is missing: $native"
   patched_archs="$(/usr/bin/lipo -archs "$patched" 2>/dev/null || true)"
-  case " $patched_archs " in *" arm64 "*) ;; *) fail "$native has no arm64 slice" ;; esac
 
-  if [ "$native" = 'liblwjgl.dylib' ]; then
-    printf ' %s ' "$patched_archs" | grep -q ' x86_64 ' \
-      || fail "patched liblwjgl.dylib is not Universal; its new fullscreen JNI requires patched arm64 and x86_64 slices"
+  if [ "$HOST_ARCH" = 'arm64' ]; then
+    case " $patched_archs " in *" arm64 "*) ;; *) fail "$native has no arm64 slice" ;; esac
+    /usr/bin/lipo -extract arm64 "$patched" -output "$patched.native"
   else
-    unzip -p "$JAR" "$native" > "$WORK/original-natives/$native" \
-      || fail "the verified Steam jar has no $native"
-    original_archs="$(/usr/bin/lipo -archs "$WORK/original-natives/$native" 2>/dev/null || true)"
-    case " $original_archs " in *" x86_64 "*) ;; *) fail "original $native has no x86_64 slice" ;; esac
-    /usr/bin/lipo -extract arm64 "$patched" -output "$WORK/jar-overlay/$native.arm64"
-    /usr/bin/lipo -extract x86_64 "$WORK/original-natives/$native" -output "$WORK/jar-overlay/$native.x86_64"
-    /usr/bin/lipo -create "$WORK/jar-overlay/$native.arm64" "$WORK/jar-overlay/$native.x86_64" \
-      -output "$WORK/jar-overlay/$native.universal"
-    rm -f "$WORK/jar-overlay/$native.arm64" "$WORK/jar-overlay/$native.x86_64"
-    mv "$WORK/jar-overlay/$native.universal" "$patched"
+    if [ "$native" = 'liblwjgl.dylib' ]; then
+      case " $patched_archs " in *" x86_64 "*) ;; *) fail "patched liblwjgl.dylib has no x86_64 slice" ;; esac
+      /usr/bin/lipo -extract x86_64 "$patched" -output "$patched.native"
+    else
+      unzip -p "$SOURCE_JAR" "$native" > "$WORK/original-natives/$native" \
+        || fail "the verified Steam jar has no $native"
+      original_archs="$(/usr/bin/lipo -archs "$WORK/original-natives/$native" 2>/dev/null || true)"
+      case " $original_archs " in *" x86_64 "*) ;; *) fail "original $native has no x86_64 slice" ;; esac
+      /usr/bin/lipo -extract x86_64 "$WORK/original-natives/$native" -output "$patched.native"
+    fi
   fi
+  mv "$patched.native" "$patched"
 
   final_archs="$(/usr/bin/lipo -archs "$patched")"
-  case " $final_archs " in *" arm64 "*) ;; *) fail "$native Universal verification lost arm64" ;; esac
-  case " $final_archs " in *" x86_64 "*) ;; *) fail "$native Universal verification lost x86_64" ;; esac
+  [ "$final_archs" = "$HOST_ARCH" ] \
+    || fail "$native is not host-native-only $HOST_ARCH: $final_archs"
   codesign --force -s - "$patched"
   codesign --verify --strict "$patched" || fail "$native ad-hoc signature verification failed"
   printf '%s\r\n' "$(shasum -a 1 "$patched" | awk '{print $1}')" > "$patched.sha1"
 done
 
+# Thin the original Steam API locally as well. The arm64 bridge uses its newer
+# ABI-matched companion name; Intel continues to use the original x86_64 code.
+unzip -p "$SOURCE_JAR" libsteam_api.dylib > "$WORK/original-natives/libsteam_api.dylib" \
+  || fail 'the verified Steam jar has no libsteam_api.dylib'
+STEAM_API_ARCHS="$(/usr/bin/lipo -archs "$WORK/original-natives/libsteam_api.dylib" 2>/dev/null || true)"
+case " $STEAM_API_ARCHS " in *" $HOST_ARCH "*) ;; *) fail "original Steam API has no $HOST_ARCH slice" ;; esac
+/usr/bin/lipo -extract "$HOST_ARCH" "$WORK/original-natives/libsteam_api.dylib" \
+  -output "$WORK/jar-overlay/libsteam_api.dylib"
+codesign --force -s - "$WORK/jar-overlay/libsteam_api.dylib"
+codesign --verify --strict "$WORK/jar-overlay/libsteam_api.dylib" \
+  || fail 'host-native Steam API signature verification failed'
+printf '%s\r\n' "$(shasum -a 1 "$WORK/jar-overlay/libsteam_api.dylib" | awk '{print $1}')" \
+  > "$WORK/jar-overlay/libsteam_api.dylib.sha1"
+
+if [ "$HOST_ARCH" = 'x86_64' ]; then
+  rm -f "$WORK/jar-overlay/libsteam_api_arm64.dylib" \
+    "$WORK/jar-overlay/libsteam_api_arm64.dylib.sha1"
+fi
+
 log "building and testing the candidate patched jar..."
-cp -c "$JAR" "$WORK/staged/desktop-1.0.jar" 2>/dev/null || cp -p "$JAR" "$WORK/staged/desktop-1.0.jar"
+cp -c "$SOURCE_JAR" "$WORK/staged/desktop-1.0.jar" 2>/dev/null \
+  || cp -p "$SOURCE_JAR" "$WORK/staged/desktop-1.0.jar"
 (
   cd "$WORK/jar-overlay"
   zip -q -r "$WORK/staged/desktop-1.0.jar" . -x '*.DS_Store' -x '._*'
@@ -209,7 +293,24 @@ while IFS= read -r entry; do
   [ -n "$entry" ] || continue
   zip -d "$WORK/staged/desktop-1.0.jar" "$entry" >/dev/null 2>&1 || true
 done < "$PAYLOAD/jar-delete.txt"
+if [ "$HOST_ARCH" = x86_64 ]; then
+  for entry in "${HOST_DELETE_ENTRIES[@]}"; do
+    zip -d "$WORK/staged/desktop-1.0.jar" "$entry" >/dev/null 2>&1 || true
+  done
+fi
 unzip -tq "$WORK/staged/desktop-1.0.jar" >/dev/null || fail "candidate jar integrity test failed"
+
+mkdir "$WORK/staged/native-audit"
+(
+  cd "$WORK/staged/native-audit"
+  unzip -q "$WORK/staged/desktop-1.0.jar" '*.dylib' '*.jnilib' 2>/dev/null || true
+)
+while IFS= read -r native_path; do
+  native_archs="$(/usr/bin/lipo -archs "$native_path" 2>/dev/null || true)"
+  [ "$native_archs" = "$HOST_ARCH" ] \
+    || fail "candidate contains a non-$HOST_ARCH macOS native: ${native_path#"$WORK/staged/native-audit/"} ($native_archs)"
+done < <(find "$WORK/staged/native-audit" -type f \( -name '*.dylib' -o -name '*.jnilib' \) -print)
+rm -rf "$WORK/staged/native-audit"
 
 mkdir "$WORK/staged/jre"
 cp -R "$PAYLOAD/jre/$HOST_ARCH/." "$WORK/staged/jre/"
@@ -217,26 +318,58 @@ chmod +x "$WORK/staged/jre/bin/java"
 JRE_ARCHS="$(/usr/bin/lipo -archs "$WORK/staged/jre/bin/java" 2>/dev/null || true)"
 case " $JRE_ARCHS " in *" $HOST_ARCH "*) ;; *) fail "bundled Zulu JRE does not support $HOST_ARCH" ;; esac
 
+# Steam's legacy launch metadata for this game prefers the x86_64 slice when
+# one is present. On an Apple Silicon Mac without Rosetta, installing the fat
+# launcher would therefore fail before our code can run. The Release remains
+# Universal, while each installation receives only its native launcher slice,
+# just like the architecture-specific JRE selected above.
+/usr/bin/lipo -extract "$HOST_ARCH" "$PAYLOAD/launcher" \
+  -output "$WORK/staged/SlayTheSpire"
+chmod +x "$WORK/staged/SlayTheSpire"
+LAUNCHER_ARCHS="$(/usr/bin/lipo -archs "$WORK/staged/SlayTheSpire" 2>/dev/null || true)"
+[ "$LAUNCHER_ARCHS" = "$HOST_ARCH" ] \
+  || fail "native launcher slice verification failed: $LAUNCHER_ARCHS"
+codesign --verify --strict "$WORK/staged/SlayTheSpire" \
+  || fail "native launcher slice signature verification failed"
+
 if [ "$DRY_RUN" = "1" ]; then
-  log "dry run passed: supported Steam jar, $HOST_ARCH Zulu JRE, and Universal native slices verified"
+  log "dry run passed: supported Steam jar and native-only $HOST_ARCH launcher/JRE/game natives verified"
   exit 0
 fi
 
-log "backing up original runtime, jar, launcher, and Info.plist to $BACKUP"
-mkdir "$BACKUP"
-ROLLBACK_NEEDED=1
-mv "$RES/jre" "$BACKUP/jre"
-mv "$JAR" "$BACKUP/desktop-1.0.jar"
-cp -p "$MACOS_DIR/SlayTheSpire" "$BACKUP/SlayTheSpire"
-cp -p "$CONTENTS/Info.plist" "$BACKUP/Info.plist"
-[ ! -d "$CONTENTS/_CodeSignature" ] || cp -R "$CONTENTS/_CodeSignature" "$BACKUP/_CodeSignature"
-[ ! -f "$CONTENTS/CodeResources" ] || cp -p "$CONTENTS/CodeResources" "$BACKUP/CodeResources"
+if [ "$INSTALL_MODE" = upgrade ]; then
+  log "preserving the current patch state for automatic upgrade rollback"
+  mkdir "$WORK/previous"
+  cp -p "$MACOS_DIR/SlayTheSpire" "$WORK/previous/SlayTheSpire"
+  cp -p "$CONTENTS/Info.plist" "$WORK/previous/Info.plist"
+  cp -p "$BACKUP/install-manifest.txt" "$BACKUP/installed-jre.sha256" \
+    "$BACKUP/installed-overlay.sha256" "$WORK/previous/"
+  [ ! -d "$CONTENTS/_CodeSignature" ] || cp -R "$CONTENTS/_CodeSignature" "$WORK/previous/_CodeSignature"
+  [ ! -f "$CONTENTS/CodeResources" ] || cp -p "$CONTENTS/CodeResources" "$WORK/previous/CodeResources"
+  ROLLBACK_NEEDED=1
+  mv "$RES/jre" "$WORK/previous/jre"
+  mv "$JAR" "$WORK/previous/desktop-1.0.jar"
+else
+  log "backing up original runtime, jar, launcher, and Info.plist to $BACKUP"
+  mkdir "$BACKUP"
+  ROLLBACK_NEEDED=1
+  mv "$RES/jre" "$BACKUP/jre"
+  mv "$JAR" "$BACKUP/desktop-1.0.jar"
+  cp -p "$MACOS_DIR/SlayTheSpire" "$BACKUP/SlayTheSpire"
+  cp -p "$CONTENTS/Info.plist" "$BACKUP/Info.plist"
+  [ ! -d "$CONTENTS/_CodeSignature" ] || cp -R "$CONTENTS/_CodeSignature" "$BACKUP/_CodeSignature"
+  [ ! -f "$CONTENTS/CodeResources" ] || cp -p "$CONTENTS/CodeResources" "$BACKUP/CodeResources"
+fi
 mv "$WORK/staged/jre" "$RES/jre"
 mv "$WORK/staged/desktop-1.0.jar" "$JAR"
-cp -p "$PAYLOAD/launcher" "$MACOS_DIR/SlayTheSpire"
+cp -p "$WORK/staged/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
 chmod +x "$MACOS_DIR/SlayTheSpire"
 plutil -replace NSHighResolutionCapable -bool true "$CONTENTS/Info.plist"
 plutil -replace LSMinimumSystemVersion -string '11.0' "$CONTENTS/Info.plist"
+
+if [ "${STS_TEST_FAIL_AFTER_REPLACEMENT:-0}" = 1 ]; then
+  fail 'injected post-replacement failure for rollback verification'
+fi
 
 xattr -dr com.apple.quarantine "$RES/jre" "$JAR" "$MACOS_DIR/SlayTheSpire" 2>/dev/null || true
 log "applying an ad-hoc signature..."
@@ -245,8 +378,11 @@ codesign --verify --deep --strict "$APP"
 "$RES/jre/bin/java" -version >/dev/null 2>&1 || fail "installed $HOST_ARCH JRE failed its launch test"
 sts_record_install_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$ACTUAL_SHA" "$JAR" "$RES/jre" "$MACOS_DIR/SlayTheSpire" \
-  "$CONTENTS/Info.plist" "$WORK/jar-overlay" \
+  "$CONTENTS/Info.plist" "$WORK/jar-overlay" "$WORK/new-state" \
   || fail "could not record installed build state"
+for state_file in install-manifest.txt installed-jre.sha256 installed-overlay.sha256; do
+  mv "$WORK/new-state/$state_file" "$BACKUP/$state_file"
+done
 
 ROLLBACK_NEEDED=0
 log "patch $PATCH_VERSION installed successfully for $HOST_ARCH"
