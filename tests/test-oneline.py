@@ -18,8 +18,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "install-oneline.sh"
-ASSET = "SlayTheSpire-Modern-macOS-v1.2.4-universal.zip"
-BASE = "https://github.com/noahhhi/SlayTheSpire-Modern-macOS-support/releases/download/v1.2.4/"
+ASSET = "SlayTheSpire-Modern-macOS-v1.2.5-universal.zip"
+BASE = "https://github.com/noahhhi/SlayTheSpire-Modern-macOS-support/releases/download/v1.2.5/"
 REAL_UNZIP = shutil.which("unzip")
 REAL_SHASUM = shutil.which("shasum")
 assert REAL_UNZIP and REAL_SHASUM

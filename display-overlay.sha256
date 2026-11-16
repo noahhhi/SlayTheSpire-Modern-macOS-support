@@ -1,0 +1,3 @@
+# Patched display classes. See scripts/prepare-display-overlay.sh.
+3b244e57ae37b77a1928acd86983750d174d2cb8e62774b6e05a7fcb52882763  payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglGraphics.class
+e6dc8bdc7277853730b2511ac9896addf37304919ccb48947ac8975fb63c35d0  payload/jar/com/megacrit/cardcrawl/desktop/DesktopLauncher.class

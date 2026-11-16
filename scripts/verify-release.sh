@@ -12,6 +12,7 @@ required=(
   VERSION README.md README.zh-CN.md RELEASE_NOTES.md install.sh install-state.sh uninstall.sh
   supported-versions.sha256 payload.sha256 payload/launcher payload/jar-delete.txt
   overlay-drop.txt
+  display-overlay.sha256
   payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class
   payload/jre/arm64/bin/java payload/jre/x86_64/bin/java
 )

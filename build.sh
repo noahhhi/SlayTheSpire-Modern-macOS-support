@@ -25,13 +25,14 @@ trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 "$ROOT/tests/test-install-idempotency.sh"
 "$ROOT/tests/test-postinstall.sh"
 python3 "$ROOT/tests/test-overlay-debug-info.py"
+"$ROOT/tests/test-display-overlay.sh"
 
 rm -rf "$DIST"
 mkdir -p "$DIST" "$STAGE" "$PKGROOT$INSTALL_LOCATION" "$PKGSCRIPTS"
 cp install.sh uninstall.sh 'Install SlayTheSpire Modern macOS.command' \
   install-state.sh README.md README.zh-CN.md RELEASE_NOTES.md VERSION \
   supported-versions.sha256 supported-upgrades.sha256 supported-mts-launchers.sha256 \
-  overlay-drop.txt "$STAGE/"
+  overlay-drop.txt display-overlay.sha256 "$STAGE/"
 cp -R payload "$STAGE/payload"
 mkdir -p "$STAGE/payload/mts" "$STAGE/payload/mts-source"
 cp -R launcher/mts-classes/. "$STAGE/payload/mts/"

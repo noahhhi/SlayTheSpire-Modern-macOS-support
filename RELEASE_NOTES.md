@@ -1,3 +1,44 @@
+# v1.2.5 — HiDPI fill on notch MacBooks
+
+## English
+
+- Fixes the thick left/right black bars reported on the new notch MacBook. The
+  overlay kept the logical canvas at the saved window size (`1470x956`) while
+  macOS clamps the real window to `1470x895` (or `1470x923` in fullscreen), so
+  the `FitViewport` preserved the wrong aspect ratio. `LwjglGraphics` now copies
+  the real window size into the logical canvas right after the window is
+  created; the viewport fills the whole drawable area.
+- Fullscreen and borderless-fullscreen now request an **undecorated** window, so
+  the 28 pt title bar is no longer wasted and the game fills everything below
+  the menu-bar/notch strip.
+- Verified on a MacBook Air M2 (`2560x1664`, notch): window `1470x923`, backing
+  `2940x1846`, GL viewport `0,0 2940x1846`, pixel scale `2.0`. No side bars and
+  no title bar; HiDPI is active at 2x.
+- The 33 pt menu-bar strip (which contains the notch) remains visible: hiding
+  it needs `NSApplicationPresentationHideMenuBar` through a native helper,
+  which is outside this build. Everything the game can draw below that strip is
+  filled edge to edge.
+- Adds `tests/test-display-overlay.sh` and `display-overlay.sha256`; the release
+  build fails if the two patched display classes drift.
+
+## 中文
+
+- 修复新刘海屏 MacBook 上全屏时左右两条粗黑边。原因是 overlay 把逻辑画布固定
+  在保存的窗口尺寸 `1470x956`，而 macOS 实际窗口是 `1470x895`（全屏时
+  `1470x923`），`FitViewport` 按错误比例做 letterbox。现在 `LwjglGraphics`
+  在窗口创建后把真实窗口尺寸写回逻辑画布，viewport 会铺满整个 drawable。
+- 全屏 / 无边框全屏改为请求 **无标题栏** 窗口，不再浪费 28 pt 的标题栏，游戏
+  会一直铺到菜单栏/刘海条下方。
+- 在 MacBook Air M2（`2560x1664`，刘海屏）实测：窗口 `1470x923`，backing
+  `2940x1846`，GL viewport `0,0 2940x1846`，像素比例 `2.0`。没有左右黑边，
+  也没有标题栏，HiDPI 为 2 倍渲染。
+- 顶部 33 pt 菜单栏（刘海所在条带）仍然显示：要让它隐藏需要原生
+  `NSApplicationPresentationHideMenuBar` 辅助库，不在本次构建范围内；除此之外的区域已铺满。
+- 新增 `tests/test-display-overlay.sh` 与 `display-overlay.sha256`，两个
+  显示类被改动时发布会直接失败。
+
+---
+
 # v1.2.4 — BaseMod patch compatibility for the modded launch
 
 ## English
