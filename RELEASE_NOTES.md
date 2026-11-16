@@ -1,3 +1,43 @@
+# v1.2.11 — Native fullscreen restored, window state remembered
+
+## English
+
+- The green button is a real macOS full-screen button again (two arrows, not
+  zoom). The game window keeps `NSWindowCollectionBehaviorFullScreenPrimary`,
+  so close / minimize / fullscreen work through the standard title-bar
+  controls, including in fullscreen where they reveal with the menu bar.
+- Native fullscreen is now restored on the next launch when that is how the
+  game was last closed; a windowed exit restores its exact frame. Only the
+  actual game window participates, so the ModTheSpire selector and hidden
+  GLFW helper windows can no longer overwrite the saved geometry (a 160×160
+  helper frame from the previous build is discarded once).
+- The installer adds `NSPrefersDisplaySafeAreaCompatibilityMode=false` to the
+  Steam app bundle and re-registers it with LaunchServices. Without this,
+  macOS treats the JVM as a camera-housing compatibility app and letterboxes
+  the full-screen Space on all sides. With it, the game fills the whole area
+  below the notch strip; the 32 pt strip that macOS reserves for the camera
+  housing is the only remaining inset, exactly as with other native macOS
+  full-screen apps. `uninstall.sh` restores the original plist.
+- OpenAL is paused while the app is in the background and resumed on
+  activation, so menu music and sounds stop when the game is not frontmost
+  (rendering was already paused via `backgroundFPS = -1`).
+
+## 中文
+
+- 绿色按钮恢复为真正的 macOS 全屏键（双向箭头，不再是缩放“+”）。窗口保留
+  `NSWindowCollectionBehaviorFullScreenPrimary`，关闭 / 最小化 / 全屏都可以
+  通过标题栏三色按钮操作；全屏时与普通 macOS 应用一样随菜单栏上滑显示。
+- 退出时如果是原生全屏，下次启动会恢复全屏；如果是窗口退出，则恢复精确的
+  窗口位置和大小。只有真正的游戏窗口会参与保存，ModTheSpire 选择器和 GLFW
+  隐藏辅助窗口不会再覆盖窗口尺寸（旧版本留下的 160×160 记录会一次性清除）。
+- 安装器会向 Steam 应用写入 `NSPrefersDisplaySafeAreaCompatibilityMode=false`
+  并重新注册 LaunchServices。否则 macOS 会把 JVM 当作“相机遮挡兼容模式”
+  应用，在全屏 Space 四周加 letterbox。写入后游戏会铺满刘海条带以下的全部
+  区域；顶部只剩 macOS 为摄像头预留的 32 pt 条带，和普通原生全屏应用一致。
+  `uninstall.sh` 会恢复原始 Info.plist。
+- 应用退到后台时暂停 OpenAL 设备，回到前台恢复，因此菜单音乐和音效不会在
+  后台继续播放（渲染此前已由 `backgroundFPS = -1` 暂停）。
+
 # v1.2.10 — Fill everything below the notch strip
 
 ## English

@@ -121,6 +121,8 @@ RESTORED_SHA="$(shasum -a 256 "$RES/desktop-1.0.jar" | awk '{print $1}')"
   || fail "restored jar checksum mismatch; patched state will be put back"
 
 RESTORE_NEEDED=0
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+[ ! -x "$LSREGISTER" ] || "$LSREGISTER" -f "$APP" >/dev/null 2>&1 || true
 rm -rf "$BACKUP" "$TRASH"
 trap - EXIT INT TERM HUP
 log "uninstall complete; the original Steam version has been restored"

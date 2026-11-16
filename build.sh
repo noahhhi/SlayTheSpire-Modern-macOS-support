@@ -20,6 +20,7 @@ trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 [ -x payload/jre/x86_64/bin/java ] || { echo 'run scripts/prepare-zulu-jres.sh first' >&2; exit 1; }
 [ -d payload/jar ] || { echo 'payload/jar is missing' >&2; exit 1; }
 
+"$ROOT/scripts/build-native-window.sh"
 "$ROOT/tests/test-mts-finder.sh"
 "$ROOT/tests/test-native-launcher.sh"
 "$ROOT/tests/test-install-idempotency.sh"

@@ -412,6 +412,10 @@ cp -p "$WORK/staged/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
 chmod +x "$MACOS_DIR/SlayTheSpire"
 plutil -replace NSHighResolutionCapable -bool true "$CONTENTS/Info.plist"
 plutil -replace LSMinimumSystemVersion -string '11.0' "$CONTENTS/Info.plist"
+# Built against an older SDK, so macOS otherwise letterboxes every native
+# full-screen Space below the camera housing (visible as bars on all sides).
+# Opt out so the game fills the whole area below the notch strip.
+plutil -replace NSPrefersDisplaySafeAreaCompatibilityMode -bool false "$CONTENTS/Info.plist"
 
 if [ "${STS_TEST_FAIL_AFTER_REPLACEMENT:-0}" = 1 ]; then
   fail 'injected post-replacement failure for rollback verification'
@@ -423,6 +427,8 @@ xattr -dr com.apple.quarantine "${XATTR_TARGETS[@]}" 2>/dev/null || true
 log "applying an ad-hoc signature..."
 codesign --force --deep -s - "$APP"
 codesign --verify --deep --strict "$APP"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+[ ! -x "$LSREGISTER" ] || "$LSREGISTER" -f "$APP" >/dev/null 2>&1 || true
 "$RES/jre/bin/java" -version >/dev/null 2>&1 || fail "installed $HOST_ARCH JRE failed its launch test"
 sts_record_install_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$ACTUAL_SHA" "$JAR" "$RES/jre" "$MACOS_DIR/SlayTheSpire" \
