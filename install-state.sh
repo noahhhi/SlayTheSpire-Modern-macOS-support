@@ -31,6 +31,24 @@ sts_checksum_value() {
   return 1
 }
 
+# Older releases did not manage mts-launcher.jar. New manifests record both
+# hashes so repeat installs and upgrades detect changes to either copy.
+sts_verify_mts_state() {
+  local backup="$1" resources="$2" expected actual key path
+  expected="$(sts_manifest_value installed-mts-launcher-sha256 "$backup/install-manifest.txt")"
+  [ -n "$expected" ] || return 0
+  for key in original installed; do
+    path="$resources/mts-launcher.jar"
+    [ "$key" != original ] || path="$backup/mts-launcher.jar"
+    [ -f "$path" ] && [ ! -L "$path" ] \
+      || { sts_state_error "$key mts-launcher.jar is missing or a symlink"; return 1; }
+    expected="$(sts_manifest_value "$key-mts-launcher-sha256" "$backup/install-manifest.txt")"
+    actual="$(shasum -a 256 "$path" | awk '{print $1}')" || return 1
+    [ -n "$expected" ] && [ "$actual" = "$expected" ] \
+      || { sts_state_error "$key mts-launcher.jar differs"; return 1; }
+  done
+}
+
 # Validate an already installed build against the state recorded beside its
 # original-file backup. This is intentionally independent of the incoming
 # release payload so a verified older build can be upgraded safely.
@@ -47,6 +65,7 @@ sts_verify_recorded_install_state() {
   local actual_jre_files=0
 
   STS_STATE_ERROR=''
+  sts_verify_mts_state "$backup" "$resources" || return 1
   [ -d "$backup" ] && [ ! -L "$backup" ] \
     || sts_state_error 'backup path is missing, invalid, or a symlink' || return 1
   for path in "$manifest" "$backup/installed-jre.sha256" "$backup/installed-overlay.sha256" \
@@ -144,6 +163,12 @@ sts_record_install_state() {
     "$patch_version" "$payload_fingerprint" "$original_jar_sha" "$installed_jar_sha" \
     "$installed_launcher_sha" "$installed_info_sha" \
     > "$state_dir/install-manifest.txt"
+  if [ -f "$backup/mts-launcher.jar" ]; then
+    printf 'original-mts-launcher-sha256=%s\ninstalled-mts-launcher-sha256=%s\n' \
+      "$(shasum -a 256 "$backup/mts-launcher.jar" | awk '{print $1}')" \
+      "$(shasum -a 256 "$(dirname "$installed_jar")/mts-launcher.jar" | awk '{print $1}')" \
+      >> "$state_dir/install-manifest.txt" || return 1
+  fi
   (
     cd "$installed_jre" || exit 1
     find . -type f -print | LC_ALL=C sort | while IFS= read -r entry; do
@@ -178,12 +203,18 @@ sts_verify_installed_state() {
   local actual_jre_files=0
 
   STS_STATE_ERROR=''
+  sts_verify_mts_state "$backup" "$resources" || return 1
   [ -d "$backup" ] && [ ! -L "$backup" ] \
     || sts_state_error 'backup path is missing, invalid, or a symlink' || return 1
   for path in "$manifest" "$backup/installed-jre.sha256" "$backup/installed-overlay.sha256" \
     "$backup/desktop-1.0.jar" "$backup/jre" "$backup/SlayTheSpire" "$backup/Info.plist"; do
     [ -e "$path" ] || sts_state_error "backup is incomplete: $(basename "$path") is missing" || return 1
   done
+
+  if [ -d "$payload/mts" ] && { [ -e "$resources/mts-launcher.jar" ] || [ -e "$backup/mts-launcher.jar" ]; }; then
+    [ -n "$(sts_manifest_value installed-mts-launcher-sha256 "$manifest")" ] \
+      || { sts_state_error 'local Workshop launcher state is missing'; return 1; }
+  fi
 
   [ "$(sts_manifest_value patch-version "$manifest")" = "$patch_version" ] \
     || sts_state_error 'installed patch version differs' || return 1

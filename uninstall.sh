@@ -43,8 +43,18 @@ BACKUP="$GAME_DIR/SlayTheSpire-Modern-backup"
 [ -f "$BACKUP/SlayTheSpire" ] || fail "backup is incomplete: launcher is missing"
 [ -f "$BACKUP/Info.plist" ] || fail "backup is incomplete: Info.plist is missing"
 
-if /usr/sbin/lsof -t -- "$RES/desktop-1.0.jar" >/dev/null 2>&1; then
+if /usr/sbin/lsof -t -- "$RES/desktop-1.0.jar" "$RES/mts-launcher.jar" >/dev/null 2>&1; then
   fail "the game is running; quit it before uninstalling"
+fi
+
+# Validate the new optional backup before moving any live files. Older releases
+# have no MTS backup and must leave the user's launcher untouched.
+MTS_EXPECTED="$(sed -n 's/^original-mts-launcher-sha256=//p' "$BACKUP/install-manifest.txt")"
+if [ -n "$MTS_EXPECTED" ]; then
+  [ -f "$BACKUP/mts-launcher.jar" ] && [ ! -L "$BACKUP/mts-launcher.jar" ] \
+    || fail "original mts-launcher.jar backup is missing or invalid"
+  [ "$(shasum -a 256 "$BACKUP/mts-launcher.jar" | awk '{print $1}')" = "$MTS_EXPECTED" ] \
+    || fail "original mts-launcher.jar backup checksum mismatch"
 fi
 
 TRASH="$GAME_DIR/.SlayTheSpire-Modern-remove.$$"
@@ -60,6 +70,7 @@ cleanup() {
     log "restore did not complete; returning to the patched state..."
     [ -e "$TRASH/jre" ] && { rm -rf "$RES/jre"; mv "$TRASH/jre" "$RES/jre"; }
     [ -e "$TRASH/desktop-1.0.jar" ] && { rm -f "$RES/desktop-1.0.jar"; mv "$TRASH/desktop-1.0.jar" "$RES/desktop-1.0.jar"; }
+    [ ! -f "$TRASH/mts-launcher.jar" ] || cp -p "$TRASH/mts-launcher.jar" "$RES/mts-launcher.jar"
     [ -f "$TRASH/SlayTheSpire" ] && cp -p "$TRASH/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
     [ -f "$TRASH/Info.plist" ] && cp -p "$TRASH/Info.plist" "$CONTENTS/Info.plist"
     rm -rf "$CONTENTS/_CodeSignature"
@@ -80,8 +91,13 @@ cp -p "$CONTENTS/Info.plist" "$TRASH/Info.plist"
 [ ! -d "$CONTENTS/_CodeSignature" ] || cp -R "$CONTENTS/_CodeSignature" "$TRASH/_CodeSignature"
 [ ! -f "$CONTENTS/CodeResources" ] || cp -p "$CONTENTS/CodeResources" "$TRASH/CodeResources"
 
-mv "$BACKUP/jre" "$RES/jre"
-mv "$BACKUP/desktop-1.0.jar" "$RES/desktop-1.0.jar"
+if [ -n "$MTS_EXPECTED" ]; then
+  cp -p "$RES/mts-launcher.jar" "$TRASH/mts-launcher.jar"
+  cp -p "$BACKUP/mts-launcher.jar" "$RES/mts-launcher.jar"
+fi
+# Copy preserved originals until the complete restore has passed verification.
+cp -R "$BACKUP/jre" "$RES/jre"
+cp -p "$BACKUP/desktop-1.0.jar" "$RES/desktop-1.0.jar"
 cp -p "$BACKUP/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
 chmod +x "$MACOS_DIR/SlayTheSpire"
 cp -p "$BACKUP/Info.plist" "$CONTENTS/Info.plist"
@@ -89,6 +105,10 @@ rm -rf "$CONTENTS/_CodeSignature"
 rm -f "$CONTENTS/CodeResources"
 [ ! -d "$BACKUP/_CodeSignature" ] || cp -R "$BACKUP/_CodeSignature" "$CONTENTS/_CodeSignature"
 [ ! -f "$BACKUP/CodeResources" ] || cp -p "$BACKUP/CodeResources" "$CONTENTS/CodeResources"
+
+if [ "${STS_TEST_FAIL_AFTER_RESTORE:-0}" = 1 ]; then
+  fail 'injected restore failure for rollback verification'
+fi
 
 EXPECTED_SHA="$(sed -n 's/^original-jar-sha256=//p' "$BACKUP/install-manifest.txt" 2>/dev/null || true)"
 RESTORED_SHA="$(shasum -a 256 "$RES/desktop-1.0.jar" | awk '{print $1}')"

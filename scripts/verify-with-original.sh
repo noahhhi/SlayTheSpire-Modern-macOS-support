@@ -31,6 +31,7 @@ make_original_app() {
   cp -cR "$ORIGINAL/jre" "$app/Contents/Resources/jre" 2>/dev/null \
     || cp -R "$ORIGINAL/jre" "$app/Contents/Resources/jre"
   cp -p "$ORIGINAL/SlayTheSpire" "$app/Contents/MacOS/SlayTheSpire"
+  cp -p "${STS_ORIGINAL_MTS:?set STS_ORIGINAL_MTS to the original mts-launcher.jar}" "$app/Contents/Resources/mts-launcher.jar"
   cp -p "$ORIGINAL/Info.plist" "$app/Contents/Info.plist"
 }
 
@@ -74,5 +75,25 @@ if [ -n "$PREVIOUS_ZIP" ]; then
     "$upgrade_app/Contents/Resources/desktop-1.0.jar" "$(uname -m)"
   "$WORK/current/install.sh" "$upgrade_app"
 fi
+
+# Fresh install and restore must preserve both JARs, including failed restore.
+fresh_app="$WORK/fresh/SlayTheSpire.app"
+make_original_app "$fresh_app"
+"$WORK/current/install.sh" "$fresh_app"
+fresh_backup="$WORK/fresh/SlayTheSpire-Modern-backup"
+cmp "$STS_ORIGINAL_MTS" "$fresh_backup/mts-launcher.jar"
+"$WORK/current/install.sh" "$fresh_app"
+set +e
+STS_TEST_FAIL_AFTER_RESTORE=1 "$WORK/current/uninstall.sh" "$fresh_app"
+restore_status=$?
+set -e
+[ "$restore_status" -ne 0 ] || { echo 'restore failure injection succeeded unexpectedly' >&2; exit 1; }
+"$WORK/current/install.sh" "$fresh_app"
+"$WORK/current/uninstall.sh" "$fresh_app"
+cmp "$STS_ORIGINAL_MTS" "$fresh_app/Contents/Resources/mts-launcher.jar"
+cmp "$ORIGINAL/desktop-1.0.jar" "$fresh_app/Contents/Resources/desktop-1.0.jar"
+cmp "$ORIGINAL/Info.plist" "$fresh_app/Contents/Info.plist"
+cmp "$ORIGINAL/SlayTheSpire" "$fresh_app/Contents/MacOS/SlayTheSpire"
+[ ! -e "$fresh_backup" ]
 
 echo 'original-Steam release gate passed for arm64, x86_64, and requested upgrade path'

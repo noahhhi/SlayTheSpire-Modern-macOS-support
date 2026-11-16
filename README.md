@@ -3,7 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 A community compatibility patch for the Steam macOS release of *Slay the
-Spire*. Version 1.2.2 is one Universal distribution for Intel and Apple
+Spire*. Version 1.2.3 is one Universal distribution for Intel and Apple
 Silicon Macs running macOS 11 or later.
 
 ## Features
@@ -48,13 +48,13 @@ resampling, just as it does for other Retina-aware apps.
 
 ### PKG (recommended)
 
-1. Download `SlayTheSpire-Modern-macOS-v1.2.2-universal.pkg` and its `.sha256`
+1. Download `SlayTheSpire-Modern-macOS-v1.2.3-universal.pkg` and its `.sha256`
    file from [Releases](../../releases).
 2. Optional integrity check:
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.2-universal.pkg.sha256
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.3-universal.pkg.sha256
    ```
 
 3. Open the package. It finds the logged-in user's Steam library and runs the
@@ -64,14 +64,14 @@ The package is currently ad-hoc/unsigned. If macOS blocks it, open System
 Settings > Privacy & Security and choose **Open Anyway**. Do not disable
 Gatekeeper globally.
 
-A verified v1.2.1 installation upgrades in place: the installer builds v1.2.2
+A verified v1.2.1 or v1.2.2 installation upgrades in place: the installer builds v1.2.3
 from the preserved original jar, keeps the original backup, and restores the
-working v1.2.1 patch automatically if the upgrade fails. Unknown or modified
+previous patch automatically if the upgrade fails. Unknown or modified
 older builds are refused without changing the game.
 
 ### ZIP fallback
 
-1. Download and verify `SlayTheSpire-Modern-macOS-v1.2.2-universal.zip`.
+1. Download and verify `SlayTheSpire-Modern-macOS-v1.2.3-universal.zip`.
 2. Extract it and double-click `Install SlayTheSpire Modern macOS.command`, or
    run:
 
@@ -94,8 +94,8 @@ the app.
 ### Terminal download helper
 
 Requires macOS 11 or later and an existing Steam installation of the game.
-Quit the game before running this command. It downloads the **v1.2.2** Universal
-ZIP (about 83 MB), verifies its release `.sha256`, extracts it into a temporary
+Quit the game before running this command. It downloads the **v1.2.3** Universal
+ZIP (about 83 MB), verifies its release `.sha256` against the hash pinned in the script, extracts it into a temporary
 directory, and runs the included `install.sh`. Without `--dry-run`, the installer
 backs up and replaces game files.
 
@@ -125,7 +125,7 @@ These commands execute code from this repository. You can download and inspect
 `install-oneline.sh` before running it. The checksum checks the ZIP's integrity;
 it is not an independent signature of the release or the helper. `pipefail` also
 reports failures while downloading the helper itself. This entry point adds no
-`sudo` or Gatekeeper commands; the existing v1.2.2 installer does clear quarantine
+`sudo` or Gatekeeper commands; the existing v1.2.3 installer does clear quarantine
 attributes on the replacement JRE, JAR, and launcher during a normal install.
 The helper downloads only the patch release, not the game.
 
@@ -192,10 +192,10 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
   checksum-bypass option because applying bytecode patches to an unknown build
   is unsafe.
 - **Legacy ARM64 backup found:** run the v1.0.0 `uninstall.sh` first, confirm
-  Steam launches the original game, then install v1.2.2.
+  Steam launches the original game, then install v1.2.3.
 - **Steam reports AppError 46 / Failed to spawn process:** v1.2.1 used a shell
   script as the app executable, which the native Apple Silicon Steam client
-  could not spawn. Install v1.2.2 or later; installing Rosetta is not required.
+  could not spawn. Install v1.2.3 or later; installing Rosetta is not required.
 - **Game is running:** quit it completely and retry.
 - **Direct launch crashes in `SteamAppsNative_getAppBuildId`:** Steamworks was
   not initialized, so the game's integration dereferenced a null `SteamApps`
@@ -213,10 +213,11 @@ Release maintainers prepare the pinned JREs and build both artifacts with:
 ./scripts/prepare-zulu-jres.sh
 ./scripts/prepare-openal.sh
 ./scripts/prepare-patch-overlay.sh
+./scripts/prepare-mts-shim.sh "/path/to/original/mts-launcher.jar"
 ./build.sh
-./scripts/verify-with-original.sh \
+STS_ORIGINAL_MTS="/path/to/original/mts-launcher.jar" ./scripts/verify-with-original.sh \
   "/path/to/SlayTheSpire-Modern-backup" \
-  "/path/to/SlayTheSpire-Modern-macOS-v1.2.1-universal.zip"
+  "/path/to/SlayTheSpire-Modern-macOS-v1.2.2-universal.zip"
 ```
 
 Pinned Azul archives:
@@ -230,7 +231,7 @@ Pinned Azul archives:
 regressions; it rejects missing architectures, payload checksum failures,
 AppleDouble metadata, and obvious game-content paths. The separate
 original-Steam gate constructs both host candidates without adding the game to
-the release, and optionally verifies the official v1.2.1 upgrade. It emits
+the release, and optionally verifies an official prior-release upgrade. It emits
 SHA-256 files for the Universal PKG and ZIP. Build formal public assets from a
 clean checkout and do not publish an artifact that fails these gates.
 
@@ -240,3 +241,29 @@ This project is not affiliated with Mega Crit or Valve. LWJGL, libGDX, and
 their components retain their upstream licenses. Azul Zulu OpenJDK is provided
 under GPLv2 with the Classpath Exception; its license files are included in the
 runtime payload.
+
+## Modded launch in v1.2.3
+
+The old `mts-launcher.jar` uses a Steamworks Java/native pairing that cannot be
+fixed by swapping in the newer arm64 native alone. The installer replaces only
+`com/megacrit/mtslauncher/MtsFinder.class` with our Java 8 shim. It preserves
+`Main.class`, the method signature, and every old native library in that JAR.
+The shim finds a downloaded `ModTheSpire.jar` in local Workshop content, using
+the game library, the default macOS Steam library, and modern/legacy paths in
+`steamapps/libraryfolders.vdf` and `config/libraryfolders.vdf`. It writes
+`steam_appid.txt=646570` and logs the selected path to `sendToDevs/mts_launcher.log`.
+Subscribe to ModTheSpire and finish its download before selecting Steam's
+modded launch option. This lookup does not download mods or query subscriptions.
+
+PKG and curl installations both use the same `install.sh` patch path. Original
+and installed MTS JAR hashes are recorded; upgrades, failed installs, and
+uninstall restore the appropriate preserved copy. Unknown MTS JARs are refused.
+The release ships only our replacement class and its source, not the game or
+original launcher JAR. Its bytecode is tested on Java 8 and verified against source.
+
+The bounded real-runtime test resolved the actual downloaded Workshop path, then
+handed a controlled child JAR to `Main.class` and exited cleanly in under 10
+seconds. The real game child was not allowed to play audio during acceptance, so
+this is launcher validation, not a gameplay test. ModTheSpire's child process
+still performs its own Steam discovery; outside Steam it can warn that it cannot
+connect. That separate behavior is unchanged by this shim.

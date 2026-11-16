@@ -2,3 +2,4 @@ payload/
 dist/
 .DS_Store
 .release-build.*
+payload.sha256

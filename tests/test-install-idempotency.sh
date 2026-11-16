@@ -115,6 +115,32 @@ fi
 echo 'tampered Info.plist: safely refused'
 cp "$WORK/installed-Info.plist" "$INFO"
 
+# New launcher state is mandatory for the incoming shim payload, while legacy
+# recorded manifests remain upgradeable without inventing an original backup.
+mkdir -p "$PAYLOAD/mts"
+printf 'old-mts\n' > "$BACKUP/mts-launcher.jar"
+printf 'new-mts\n' > "$RES/mts-launcher.jar"
+sts_record_install_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
+  "$ORIGINAL_SHA" "$RES/desktop-1.0.jar" "$RES/jre" \
+  "$MACOS_DIR/SlayTheSpire" "$INFO" "$OVERLAY"
+sts_verify_mts_state "$BACKUP" "$RES"
+cp "$RES/mts-launcher.jar" "$WORK/good-mts.jar"
+printf 'tampered\n' >> "$RES/mts-launcher.jar"
+if sts_verify_recorded_install_state "$BACKUP" "$RES/desktop-1.0.jar" "$RES" \
+  "$MACOS_DIR" "$INFO" "$HOST_ARCH"; then
+  echo 'tampered installed MTS launcher was accepted' >&2; exit 1
+fi
+[ "$STS_STATE_ERROR" = 'installed mts-launcher.jar differs' ]
+cp "$WORK/good-mts.jar" "$RES/mts-launcher.jar"
+cp "$BACKUP/mts-launcher.jar" "$WORK/original-mts.jar"
+printf 'tampered\n' >> "$BACKUP/mts-launcher.jar"
+if sts_verify_mts_state "$BACKUP" "$RES"; then
+  echo 'tampered original MTS launcher was accepted' >&2; exit 1
+fi
+[ "$STS_STATE_ERROR" = 'original mts-launcher.jar differs' ]
+cp "$WORK/original-mts.jar" "$BACKUP/mts-launcher.jar"
+echo 'installed and original MTS launcher tampering: safely refused'
+
 rm "$MACOS_DIR/SlayTheSpire"
 if sts_verify_installed_state "$BACKUP" "$PATCH_VERSION" "$PAYLOAD_FINGERPRINT" \
   "$WORK/payload.sha256" "$PAYLOAD" "$RES/desktop-1.0.jar" "$RES" \

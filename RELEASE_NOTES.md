@@ -1,3 +1,41 @@
+# v1.2.3 — Local Workshop modded launch
+
+## English
+
+- Replaces only `MtsFinder.class` in the installed `mts-launcher.jar` with a
+  Java 8 shim. The existing `Main.class` still links; no SteamAPI/SteamUGC calls
+  occur in the finder, and the launcher's old native libraries remain untouched.
+- Finds downloaded ModTheSpire in the game/default Steam library and modern or
+  legacy `libraryfolders.vdf` paths. Writes `steam_appid.txt=646570` and logs the
+  local Workshop path with actionable missing-download diagnostics.
+- Both PKG and curl use the same installer. Preserves the original MTS JAR,
+  records original/installed hashes, detects tampering, and restores it during
+  rollback or uninstall. Supports verified v1.2.1/v1.2.2 upgrades.
+- Ships only the replacement class and source, not the original launcher JAR.
+  The curl installer pins v1.2.3 and the release ZIP SHA-256.
+- Acceptance: bundled Java 8 resolved the actual downloaded Workshop path, then
+  handed a controlled child JAR to `Main.class` and exited 0 in under 10 seconds.
+  The launcher path contained no SteamAPI/UnsatisfiedLinkError. The real
+  ModTheSpire/game child was not allowed to play audio during this test, so this
+  is launcher acceptance rather than a gameplay claim. ModTheSpire's own
+  child-process Steam discovery remains outside this shim.
+
+## 中文
+
+- 仅替换 `mts-launcher.jar` 内的 `MtsFinder.class`，保持 Java 8 和原方法签名；
+  不调用 SteamAPI/SteamUGC，不替换旧 native，也不改动 `Main.class`。
+- 从本地 Steam Workshop 内容和 `libraryfolders.vdf` 新旧路径查找已下载的
+  ModTheSpire，写入 `steam_appid.txt=646570` 并记录实际路径及缺失提示。
+- PKG/curl 共用安装路径；原版 MTS JAR 备份、安装状态校验、失败回滚和卸载恢复
+  均覆盖本次修改。支持已验证的 v1.2.1/v1.2.2 原地升级。
+- 真实 bundled Java 测试先解析出本机已下载的 Workshop 路径，再向 `Main.class`
+  交接一个受控子 JAR，10 秒内退出码为 0，日志无
+  SteamAPI/UnsatisfiedLinkError。测试期间未让真实游戏子进程播放音频，因此这
+  是 launcher 验收，不声称已完成游戏内测试。ModTheSpire 子进程自身的 Steam
+  查询仍不在本次 shim 修改范围。
+
+---
+
 # v1.2.2 — 无 Rosetta 原生启动修复
 
 ## 中文

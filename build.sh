@@ -20,6 +20,7 @@ trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 [ -x payload/jre/x86_64/bin/java ] || { echo 'run scripts/prepare-zulu-jres.sh first' >&2; exit 1; }
 [ -d payload/jar ] || { echo 'payload/jar is missing' >&2; exit 1; }
 
+"$ROOT/tests/test-mts-finder.sh"
 "$ROOT/tests/test-native-launcher.sh"
 "$ROOT/tests/test-install-idempotency.sh"
 "$ROOT/tests/test-postinstall.sh"
@@ -28,8 +29,11 @@ rm -rf "$DIST"
 mkdir -p "$DIST" "$STAGE" "$PKGROOT$INSTALL_LOCATION" "$PKGSCRIPTS"
 cp install.sh uninstall.sh 'Install SlayTheSpire Modern macOS.command' \
   install-state.sh README.md README.zh-CN.md RELEASE_NOTES.md VERSION \
-  supported-versions.sha256 supported-upgrades.sha256 "$STAGE/"
+  supported-versions.sha256 supported-upgrades.sha256 supported-mts-launchers.sha256 "$STAGE/"
 cp -R payload "$STAGE/payload"
+mkdir -p "$STAGE/payload/mts" "$STAGE/payload/mts-source"
+cp -R launcher/mts-classes/. "$STAGE/payload/mts/"
+cp -R launcher/mts-src/. "$STAGE/payload/mts-source/"
 "$ROOT/scripts/prepare-native-launcher.sh" "$STAGE/payload/launcher"
 rm -f "$STAGE/payload/version.txt"
 rm -f "$STAGE/payload/jar/libsteam_api.dylib" "$STAGE/payload/jar/libsteam_api.dylib.sha1"

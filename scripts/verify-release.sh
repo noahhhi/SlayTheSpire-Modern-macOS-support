@@ -6,6 +6,9 @@ ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT"
 
 required=(
+  supported-mts-launchers.sha256
+  payload/mts/com/megacrit/mtslauncher/MtsFinder.class
+  payload/mts-source/com/megacrit/mtslauncher/MtsFinder.java
   VERSION README.md README.zh-CN.md RELEASE_NOTES.md install.sh install-state.sh uninstall.sh
   supported-versions.sha256 payload.sha256 payload/launcher payload/jar-delete.txt
   payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class
@@ -25,6 +28,15 @@ done
   || { echo 'AppleDouble or Finder metadata found' >&2; exit 1; }
 [ -z "$(find . \( -name 'desktop-1.0.jar' -o -name '*.app' -o -name '*.save' -o -name 'preferences' -o -name 'saves' \) -print -quit)" ] \
   || { echo 'game content found in release tree' >&2; exit 1; }
+
+[ "$(find payload/mts -type f | wc -l | tr -d ' ')" -eq 1 ] \
+  || { echo 'MTS overlay must contain exactly one replacement class' >&2; exit 1; }
+MTS_CLASS=payload/mts/com/megacrit/mtslauncher/MtsFinder.class
+[ "$(od -An -tx1 -N8 "$MTS_CLASS" | tr -d ' \n')" = cafebabe00000034 ] \
+  || { echo 'MTS shim must be Java 8 bytecode' >&2; exit 1; }
+if LC_ALL=C grep -a -Eq 'SteamAPI|SteamUGC|loadLibrary' "$MTS_CLASS"; then
+  echo 'MTS shim must not invoke native Steam discovery' >&2; exit 1
+fi
 
 OVERLAY_CLASS_COUNT="$(find payload/jar -type f -name '*.class' | wc -l | tr -d ' ')"
 [ "$OVERLAY_CLASS_COUNT" -eq 42 ] \

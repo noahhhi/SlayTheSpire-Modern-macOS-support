@@ -56,6 +56,8 @@ done
 [ -x /usr/sbin/lsof ] || fail "required system tool is missing: /usr/sbin/lsof"
 [ -d "$PAYLOAD/jar" ] || fail "payload/jar is missing; use the complete release archive"
 [ -d "$PAYLOAD/jre/$HOST_ARCH" ] || fail "payload/jre/$HOST_ARCH is missing"
+[ -f "$PAYLOAD/mts/com/megacrit/mtslauncher/MtsFinder.class" ] || fail "local Workshop shim is missing"
+[ -f "$SCRIPT_DIR/supported-mts-launchers.sha256" ] || fail "supported-mts-launchers.sha256 is missing"
 [ -f "$PAYLOAD/launcher" ] || fail "payload/launcher is missing"
 [ -f "$PAYLOAD/jar-delete.txt" ] || fail "payload/jar-delete.txt is missing"
 [ -f "$SCRIPT_DIR/VERSION" ] || fail "VERSION is missing"
@@ -107,9 +109,18 @@ WORK="$GAME_DIR/.SlayTheSpire-Modern-install.$$"
 PATCH_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/VERSION")"
 INSTALL_MODE=fresh
 SOURCE_JAR="$JAR"
+MTS_JAR="$RES/mts-launcher.jar"
+SOURCE_MTS="$MTS_JAR"
+MTS_PRESENT=0
+MTS_BACKUP_ADDED=0
 
 log "found game: $APP"
 [ -f "$JAR" ] || fail "desktop-1.0.jar is missing; this is not the supported Steam app"
+if [ -e "$MTS_JAR" ] || [ -L "$MTS_JAR" ]; then
+  [ -f "$MTS_JAR" ] && [ ! -L "$MTS_JAR" ] \
+    || fail "mts-launcher.jar is not a regular file"
+  MTS_PRESENT=1
+fi
 [ -d "$RES/jre" ] || fail "the original Resources/jre is missing"
 [ -f "$MACOS_DIR/SlayTheSpire" ] || fail "the original launcher is missing"
 [ -f "$CONTENTS/Info.plist" ] || fail "Info.plist is missing"
@@ -135,10 +146,16 @@ if [ -e "$BACKUP" ]; then
   fi
   INSTALL_MODE=upgrade
   SOURCE_JAR="$BACKUP/desktop-1.0.jar"
+  if [ -f "$BACKUP/mts-launcher.jar" ]; then
+    MTS_PRESENT=1
+    SOURCE_MTS="$BACKUP/mts-launcher.jar"
+  fi
   log "verified installed patch $PRIOR_VERSION; preparing an in-place upgrade to $PATCH_VERSION"
 fi
 
-if /usr/sbin/lsof -t -- "$JAR" >/dev/null 2>&1; then
+LSOF_TARGETS=("$JAR")
+[ "$MTS_PRESENT" = 0 ] || LSOF_TARGETS+=("$MTS_JAR")
+if /usr/sbin/lsof -t -- "${LSOF_TARGETS[@]}" >/dev/null 2>&1; then
   fail "the game is running; quit it before installing"
 fi
 
@@ -146,6 +163,13 @@ log "verifying the preserved unmodified Steam jar..."
 ACTUAL_SHA="$(shasum -a 256 "$SOURCE_JAR" | awk '{print $1}')"
 if ! awk -v hash="$ACTUAL_SHA" '$1 == hash { found=1 } END { exit !found }' "$SUPPORTED_HASHES"; then
   fail "unsupported or modified desktop-1.0.jar (sha256: $ACTUAL_SHA). Use Steam > Properties > Installed Files > Verify integrity, then retry."
+fi
+
+if [ "$MTS_PRESENT" = 1 ]; then
+  MTS_ORIGINAL_SHA="$(shasum -a 256 "$SOURCE_MTS" | awk '{print $1}')"
+  awk -v hash="$MTS_ORIGINAL_SHA" '$1 == hash { found=1 } END { exit !found }' \
+    "$SCRIPT_DIR/supported-mts-launchers.sha256" \
+    || fail "unsupported or modified mts-launcher.jar; originals left untouched"
 fi
 
 ROLLBACK_NEEDED=0
@@ -158,6 +182,8 @@ cleanup() {
       log "upgrade did not complete; restoring the previously installed patch..."
       [ -e "$WORK/previous/jre" ] && { rm -rf "$RES/jre"; mv "$WORK/previous/jre" "$RES/jre"; }
       [ -e "$WORK/previous/desktop-1.0.jar" ] && { rm -f "$JAR"; mv "$WORK/previous/desktop-1.0.jar" "$JAR"; }
+      [ "$MTS_PRESENT" = 0 ] || cp -p "$WORK/previous/mts-launcher.jar" "$MTS_JAR"
+      [ "$MTS_BACKUP_ADDED" != 1 ] || rm -f "$BACKUP/mts-launcher.jar"
       [ -f "$WORK/previous/SlayTheSpire" ] && cp -p "$WORK/previous/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
       [ -f "$WORK/previous/Info.plist" ] && cp -p "$WORK/previous/Info.plist" "$CONTENTS/Info.plist"
       rm -rf "$CONTENTS/_CodeSignature"
@@ -171,6 +197,7 @@ cleanup() {
       log "installation did not complete; restoring the original files..."
       [ -e "$BACKUP/jre" ] && { rm -rf "$RES/jre"; mv "$BACKUP/jre" "$RES/jre"; }
       [ -e "$BACKUP/desktop-1.0.jar" ] && { rm -f "$JAR"; mv "$BACKUP/desktop-1.0.jar" "$JAR"; }
+      [ "$MTS_PRESENT" = 0 ] || cp -p "$BACKUP/mts-launcher.jar" "$MTS_JAR"
       [ -f "$BACKUP/SlayTheSpire" ] && cp -p "$BACKUP/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
       [ -f "$BACKUP/Info.plist" ] && cp -p "$BACKUP/Info.plist" "$CONTENTS/Info.plist"
       rm -rf "$CONTENTS/_CodeSignature"
@@ -312,6 +339,16 @@ while IFS= read -r native_path; do
 done < <(find "$WORK/staged/native-audit" -type f \( -name '*.dylib' -o -name '*.jnilib' \) -print)
 rm -rf "$WORK/staged/native-audit"
 
+if [ "$MTS_PRESENT" = 1 ]; then
+  # Replace exactly one entry. Never swap the legacy launcher's native libraries.
+  cp -p "$SOURCE_MTS" "$WORK/staged/mts-launcher.jar"
+  (cd "$PAYLOAD/mts" && zip -q "$WORK/staged/mts-launcher.jar" com/megacrit/mtslauncher/MtsFinder.class)
+  unzip -tq "$WORK/staged/mts-launcher.jar" >/dev/null || fail "candidate mts-launcher.jar is corrupt"
+  MTS_CLASS_SHA="$(unzip -p "$WORK/staged/mts-launcher.jar" com/megacrit/mtslauncher/MtsFinder.class | shasum -a 256 | awk '{print $1}')"
+  [ "$MTS_CLASS_SHA" = "$(shasum -a 256 "$PAYLOAD/mts/com/megacrit/mtslauncher/MtsFinder.class" | awk '{print $1}')" ] \
+    || fail "candidate local Workshop shim differs"
+fi
+
 mkdir "$WORK/staged/jre"
 cp -R "$PAYLOAD/jre/$HOST_ARCH/." "$WORK/staged/jre/"
 chmod +x "$WORK/staged/jre/bin/java"
@@ -346,13 +383,19 @@ if [ "$INSTALL_MODE" = upgrade ]; then
     "$BACKUP/installed-overlay.sha256" "$WORK/previous/"
   [ ! -d "$CONTENTS/_CodeSignature" ] || cp -R "$CONTENTS/_CodeSignature" "$WORK/previous/_CodeSignature"
   [ ! -f "$CONTENTS/CodeResources" ] || cp -p "$CONTENTS/CodeResources" "$WORK/previous/CodeResources"
+  [ "$MTS_PRESENT" = 0 ] || cp -p "$MTS_JAR" "$WORK/previous/mts-launcher.jar"
   ROLLBACK_NEEDED=1
+  if [ "$MTS_PRESENT" = 1 ] && [ ! -e "$BACKUP/mts-launcher.jar" ]; then
+    MTS_BACKUP_ADDED=1
+    cp -p "$MTS_JAR" "$BACKUP/mts-launcher.jar"
+  fi
   mv "$RES/jre" "$WORK/previous/jre"
   mv "$JAR" "$WORK/previous/desktop-1.0.jar"
 else
   log "backing up original runtime, jar, launcher, and Info.plist to $BACKUP"
   mkdir "$BACKUP"
   ROLLBACK_NEEDED=1
+  [ "$MTS_PRESENT" = 0 ] || cp -p "$MTS_JAR" "$BACKUP/mts-launcher.jar"
   mv "$RES/jre" "$BACKUP/jre"
   mv "$JAR" "$BACKUP/desktop-1.0.jar"
   cp -p "$MACOS_DIR/SlayTheSpire" "$BACKUP/SlayTheSpire"
@@ -362,6 +405,7 @@ else
 fi
 mv "$WORK/staged/jre" "$RES/jre"
 mv "$WORK/staged/desktop-1.0.jar" "$JAR"
+[ "$MTS_PRESENT" = 0 ] || mv "$WORK/staged/mts-launcher.jar" "$MTS_JAR"
 cp -p "$WORK/staged/SlayTheSpire" "$MACOS_DIR/SlayTheSpire"
 chmod +x "$MACOS_DIR/SlayTheSpire"
 plutil -replace NSHighResolutionCapable -bool true "$CONTENTS/Info.plist"
@@ -371,7 +415,9 @@ if [ "${STS_TEST_FAIL_AFTER_REPLACEMENT:-0}" = 1 ]; then
   fail 'injected post-replacement failure for rollback verification'
 fi
 
-xattr -dr com.apple.quarantine "$RES/jre" "$JAR" "$MACOS_DIR/SlayTheSpire" 2>/dev/null || true
+XATTR_TARGETS=("$RES/jre" "$JAR" "$MACOS_DIR/SlayTheSpire")
+[ "$MTS_PRESENT" = 0 ] || XATTR_TARGETS+=("$MTS_JAR")
+xattr -dr com.apple.quarantine "${XATTR_TARGETS[@]}" 2>/dev/null || true
 log "applying an ad-hoc signature..."
 codesign --force --deep -s - "$APP"
 codesign --verify --deep --strict "$APP"

@@ -7,6 +7,7 @@ The curl shim has no network implementation; every request uses a local file.
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
@@ -17,8 +18,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "install-oneline.sh"
-ASSET = "SlayTheSpire-Modern-macOS-v1.2.2-universal.zip"
-BASE = "https://github.com/noahhhi/SlayTheSpire-Modern-macOS-support/releases/download/v1.2.2/"
+ASSET = "SlayTheSpire-Modern-macOS-v1.2.3-universal.zip"
+BASE = "https://github.com/noahhhi/SlayTheSpire-Modern-macOS-support/releases/download/v1.2.3/"
 REAL_UNZIP = shutil.which("unzip")
 REAL_SHASUM = shutil.which("shasum")
 assert REAL_UNZIP and REAL_SHASUM
@@ -44,7 +45,7 @@ def executable(path, content):
 def run_case(root, name, *, args=(), app=None, checksum_mode="normal",
              archive_mode="normal", env_extra=None, expected_rc=0,
              called=False, expected_message=None, pipe=False, missing_tool=False,
-             script_bytes=None):
+             script_bytes=None, wrong_pin=False):
     case = root / name
     case.mkdir()
     fake_bin = case / "bin"
@@ -133,8 +134,16 @@ exec "$FIXTURE_REAL_SHASUM" "$@"
         # uname exists, but curl is intentionally absent and PATH has no fallback.
         (fake_bin / 'curl').unlink()
         env['PATH'] = str(fake_bin)
-    command = ['/bin/bash', '-s', '--', *args] if pipe else ['/bin/bash', str(SCRIPT), *args]
-    result = subprocess.run(command, input=(script_bytes if script_bytes is not None else SCRIPT.read_bytes()) if pipe else b'',
+    # Only the local test copy substitutes its tiny fixture digest for the
+    # production release pin. The production script has no override switch.
+    source = script_bytes if script_bytes is not None else SCRIPT.read_bytes()
+    fixture_pin = 'f' * 64 if wrong_pin else digest
+    source = re.sub(rb"local archive_sha256='[0-9a-f]{64}'",
+                    ("local archive_sha256='"+fixture_pin+"'").encode(), source)
+    fixture_script = case / 'install-oneline.sh'
+    fixture_script.write_bytes(source)
+    command = ['/bin/bash' , '-s', '--', *args] if pipe else ['/bin/bash', str(fixture_script), *args]
+    result = subprocess.run(command, input=source if pipe else b'',
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             env=env, cwd=case, timeout=20)
     output = result.stdout.decode()
@@ -191,9 +200,10 @@ def main():
                  expected_rc=1, expected_message='download failed')
         for mode in ['mismatch', 'wrong-name', 'path-traversal', 'malformed', 'short-hash', 'empty', 'extra-line', 'html']:
             test(f'checksum-{mode}', checksum_mode=mode, expected_rc=1,
-                 expected_message='SHA-256 mismatch' if mode == 'mismatch' else 'invalid checksum file')
+                 expected_message='checksum differs' if mode == 'mismatch' else 'invalid checksum file')
         for mode in ['crlf', 'binary']:
             test(f'checksum-{mode}', checksum_mode=mode, called=True)
+        test('release-pin-mismatch', wrong_pin=True, expected_rc=1, expected_message='checksum differs')
         test('hash-tool-failure', env_extra={'FIXTURE_HASH_FAILURE': '1'}, expected_rc=1,
              expected_message='could not calculate')
         test('unzip-failure', env_extra={'FIXTURE_UNZIP_FAILURE': '1'}, expected_rc=1,
