@@ -15,6 +15,9 @@ required=(
   display-overlay.sha256
   supported-basemod.sha256 patched-basemod.sha256
   payload/basemod/BaseModPatch.class
+  payload/jar/com/megacrit/cardcrawl/desktop/StsWindow.class
+  payload/jar/com/megacrit/cardcrawl/desktop/StsViewport.class
+  payload/jar/libstsmacwindow.dylib
   payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class
   payload/jre/arm64/bin/java payload/jre/x86_64/bin/java
 )
@@ -45,8 +48,9 @@ fi
 OVERLAY_CLASS_COUNT="$(find payload/jar -type f -name '*.class' | wc -l | tr -d ' ')"
 # 42 upstream classes minus the helpers listed in overlay-drop.txt that are
 # instruction-identical to the Steam originals (shipping them would only drop
-# LocalVariableTable data that ModTheSpire patches rely on).
-EXPECTED_OVERLAY=$((42 - $(grep -vcE '^\s*(#|$)' overlay-drop.txt)))
+# LocalVariableTable data that ModTheSpire patches rely on), plus the two new
+# StsWindow/StsViewport classes.
+EXPECTED_OVERLAY=$((42 - $(grep -vcE '^\s*(#|$)' overlay-drop.txt) + 2))
 [ "$OVERLAY_CLASS_COUNT" -eq "$EXPECTED_OVERLAY" ] \
   || { echo "unexpected Java overlay size: $OVERLAY_CLASS_COUNT classes (expected $EXPECTED_OVERLAY)" >&2; exit 1; }
 

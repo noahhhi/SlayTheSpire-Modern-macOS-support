@@ -1,3 +1,45 @@
+# v1.2.8 — Live windowed fullscreen with working window buttons
+
+## English
+
+- Fullscreen and borderless-fullscreen are now **windowed fullscreen**: the game
+  keeps a normal titled macOS window (red/yellow/green buttons, minimize and
+  zoom all work) and simply maximizes it to the visible screen area. No
+  exclusive fullscreen Space, no borderless style, no hidden title bar.
+- Switching between windowed and fullscreen is live again — no restart. Entering
+  fullscreen saves the current window frame and maximizes; leaving restores it
+  (a screen-sized frame is shrunk to a normal `1280x800` window so windowed mode
+  is actually usable).
+- The game draws through `StsViewport`, which stretches the fixed design canvas
+  over the whole content area. The earlier top/bottom letterbox band is gone and
+  the cached UI layout is untouched, so nothing shifts.
+- The launcher no longer sets `Window.undecorated=true` or
+  `Window.startNativeFullscreen=true`; the native helper only changes the frame
+  and uses `visibleFrame`, so the menu bar/notch strip stays as-is.
+- Restores the normal Settings behaviour for Fullscreen / Borderless /
+  resolution options (they apply immediately instead of showing Restart
+  Required). The v1.2.6 BaseMod HiDPI fix, idle-background rendering and stable
+  `info.displayconfig` stay in place.
+
+## 中文
+
+- 全屏 / 无边框全屏改为 **窗口化全屏**：游戏始终是正常的带标题栏 macOS 窗口
+  （红黄绿三个按键、最小化、缩放都可用），只是把窗口最大化到可见屏幕区域。
+  不使用独占全屏 Space，不切换无边框样式，不隐藏标题栏。
+- 窗口 ↔ 全屏恢复为**实时切换**，无需重启：进入全屏时保存当前窗口 frame 并
+  最大化，退出时恢复（如果保存的是整屏尺寸，会收缩成 `1280x800` 的正常窗口，
+  保证窗口模式可用）。
+- 渲染改用 `StsViewport`：固定设计画布拉伸铺满整个内容区，顶部/底部 letterbox
+  黑边消失；UI 缓存布局不变，不会错位。
+- 启动器不再设置 `Window.undecorated=true` 或
+  `Window.startNativeFullscreen=true`；原生辅助库只改 frame 并使用
+  `visibleFrame`，菜单栏/刘海条带保持原样。
+- 恢复设置里 Fullscreen / Borderless / 分辨率选项的正常行为（即时生效，不再
+  提示 Restart Required）。v1.2.6 的 BaseMod HiDPI 修复、后台暂停和
+  `info.displayconfig` 稳定性保持不变。
+
+---
+
 # v1.2.7 — No top letterbox band when switching to fullscreen
 
 ## English

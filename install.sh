@@ -233,6 +233,7 @@ if [ "$HOST_ARCH" = arm64 ]; then
     libgdx.dylib
     libgdx64.dylib
     liblwjgl.dylib
+    libstsmacwindow.dylib
     libsteamworks4j.dylib
     openal.dylib
   )
@@ -246,6 +247,7 @@ else
     libgdx-freetype64.dylib
     libgdx64.dylib
     liblwjgl.dylib
+    libstsmacwindow.dylib
     libsteamworks4j.dylib
     openal.dylib
   )
@@ -269,7 +271,7 @@ for native in "${ARCH_NATIVE_FILES[@]}"; do
     case " $patched_archs " in *" arm64 "*) ;; *) fail "$native has no arm64 slice" ;; esac
     /usr/bin/lipo -extract arm64 "$patched" -output "$patched.native"
   else
-    if [ "$native" = 'liblwjgl.dylib' ]; then
+    if [ "$native" = 'liblwjgl.dylib' ] || [ "$native" = 'libstsmacwindow.dylib' ]; then
       case " $patched_archs " in *" x86_64 "*) ;; *) fail "patched liblwjgl.dylib has no x86_64 slice" ;; esac
       /usr/bin/lipo -extract x86_64 "$patched" -output "$patched.native"
     else
