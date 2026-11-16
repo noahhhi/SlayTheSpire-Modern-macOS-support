@@ -1,3 +1,40 @@
+# v1.2.7 — No top letterbox band when switching to fullscreen
+
+## English
+
+- Fixes the extra black band at the top after switching windowed → fullscreen.
+  The logical canvas (`Settings.WIDTH/HEIGHT`) is computed once at startup from
+  the real window size (windowed: `1470x895`). The old build applied fullscreen
+  live, growing the window to the `1470x923` visible area while the canvas
+  stayed `1470x895`; the `FitViewport` preserved that aspect and centered the
+  frame, which shows as a top/bottom band (the top one is what you saw).
+- Fullscreen / borderless-fullscreen / resolution changes now save the setting
+  and show the vanilla **Restart Required** text instead of resizing the window
+  mid-session. The next launch builds the canvas from the real fullscreen size,
+  so it fills edge to edge without a band.
+- This keeps the saved mode stable (`Settings.SAVED_*`, no shrinking
+  `info.displayconfig`) and avoids the UI misalignment that a live canvas resize
+  causes, because cached UI positions are computed from `Settings.WIDTH/HEIGHT`
+  at startup.
+- Windowed resizing still follows the canvas aspect; live fullscreen layout
+  changes remain restart-scoped, matching the game's own design.
+
+## 中文
+
+- 修复“窗口切到全屏后顶部多出一条黑边”。逻辑画布 `Settings.WIDTH/HEIGHT` 在启动
+  时按真实窗口尺寸计算（窗口模式 `1470x895`）。旧版本会实时应用全屏，把窗口
+  拉高到可见区 `1470x923`，但画布仍是 `1470x895`，`FitViewport` 保持该比例并
+  居中，于是上下各留一条 letterbox，顶部那条就是看到的黑边。
+- 现在全屏 / 无边框全屏 / 分辨率切换只保存设置，并显示原版的
+  **Restart Required** 提示，不再在运行中改变窗口；下次启动用真实全屏尺寸
+  重新构建画布，直接铺满，没有黑边。
+- 同时保持 `info.displayconfig` 不再递减（写 `Settings.SAVED_*`），也避免了
+  实时改画布导致的 UI 错位（UI 位置是在启动时按 `Settings.WIDTH/HEIGHT` 算好并
+  缓存的）。
+- 窗口模式的缩放仍按画布比例跟随；全屏布局变更按原版设计走重启生效。
+
+---
+
 # v1.2.6 — Crisp BaseMod text, idle background, stable display state
 
 ## English

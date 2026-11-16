@@ -86,9 +86,38 @@ public final class PrepareDisplayOverlay {
             }
         });
 
+        final String restart =
+            "{ if (com.megacrit.cardcrawl.core.CardCrawlGame.mode ==" +
+            " com.megacrit.cardcrawl.core.CardCrawlGame.GameMode.CHAR_SELECT) {" +
+            "  if (com.megacrit.cardcrawl.core.CardCrawlGame.mainMenuScreen != null)" +
+            "    com.megacrit.cardcrawl.core.CardCrawlGame.mainMenuScreen.optionPanel.displayRestartRequiredText();" +
+            " } else if (com.megacrit.cardcrawl.dungeons.AbstractDungeon.settingsScreen != null) {" +
+            "  com.megacrit.cardcrawl.dungeons.AbstractDungeon.settingsScreen.panel.displayRestartRequiredText();" +
+            " } }";
+        toggleMethod.instrument(new javassist.expr.ExprEditor() {
+            public void edit(javassist.expr.MethodCall call) throws javassist.CannotCompileException {
+                if (call.getClassName().equals("com.megacrit.cardcrawl.desktop.StsDisplay")
+                        && call.getMethodName().equals("applyDisplaySettings")) {
+                    call.replace(restart);
+                }
+            }
+        });
+
+        CtClass options = pool.get("com.megacrit.cardcrawl.screens.options.OptionsPanel");
+        CtMethod change = options.getDeclaredMethod("changeResolutionToIndex", new CtClass[] { CtClass.intType });
+        change.instrument(new javassist.expr.ExprEditor() {
+            public void edit(javassist.expr.MethodCall call) throws javassist.CannotCompileException {
+                if (call.getClassName().equals("com.megacrit.cardcrawl.desktop.StsDisplay")
+                        && call.getMethodName().equals("applyDisplaySettings")) {
+                    call.replace("{ this.displayRestartRequiredText(); }");
+                }
+            }
+        });
+
         graphics.writeFile(args[2]);
         launcher.writeFile(args[2]);
         toggle.writeFile(args[2]);
+        options.writeFile(args[2]);
     }
 }
 JAVA
@@ -103,5 +132,7 @@ cp -p "$WORK/out/com/megacrit/cardcrawl/desktop/DesktopLauncher.class" \
   "$ROOT/payload/jar/com/megacrit/cardcrawl/desktop/DesktopLauncher.class"
 cp -p "$WORK/out/com/megacrit/cardcrawl/screens/options/ToggleButton.class" \
   "$ROOT/payload/jar/com/megacrit/cardcrawl/screens/options/ToggleButton.class"
+cp -p "$WORK/out/com/megacrit/cardcrawl/screens/options/OptionsPanel.class" \
+  "$ROOT/payload/jar/com/megacrit/cardcrawl/screens/options/OptionsPanel.class"
 
 bash "$ROOT/tests/test-display-overlay.sh"
