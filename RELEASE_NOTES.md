@@ -1,3 +1,40 @@
+# v1.2.10 — Fill everything below the notch strip
+
+## English
+
+- The remaining top strip came from macOS itself: the JVM process is treated as
+  a camera-housing compatibility app, so its fullscreen Space is letterboxed to
+  the visible area (`923pt` on this 14" Air) and the notch strip stays black.
+  The `NSPrefersDisplaySafeAreaCompatibilityMode` opt-out is not honored for
+  this JVM, so the window cannot draw into that strip.
+- Fullscreen is therefore **windowed fullscreen** again: the green button zooms
+  the normal titled window to the visible frame below the notch, and the game
+  fills that area completely (drawable-sized viewport, no internal letterbox).
+  The menu bar/notch strip stays as the system draws it — nothing below it is
+  black.
+- Red/yellow/green remain normal macOS buttons (close/minimize/zoom). The window
+  frame is persisted in `NSUserDefaults` and restored on every launch; the
+  game's own Fullscreen/Borderless settings remain inert.
+- `getBackBufferWidth/Height` now use the real Cocoa drawable size, so the
+  viewport and font scale follow the actual backing store instead of LWJGL's
+  cached window size.
+
+## 中文
+
+- 顶部残留黑条来自 macOS 本身：JVM 进程被当作“相机遮挡兼容模式”应用，全屏
+  Space 被 letterbox 到可见区（这台 14 寸 Air 是 `923pt`），刘海条带保持黑色。
+  `NSPrefersDisplaySafeAreaCompatibilityMode` 对这个 JVM 不生效，窗口无法画进
+  那条区域。
+- 因此全屏改回 **窗口化全屏**：绿色按钮把普通带标题栏窗口缩放到刘海下方的
+  可见区域，游戏完整铺满该区域（viewport 按真实 drawable 计算，没有内部
+  letterbox）。菜单栏/刘海条带保持系统原样，其下方不再有黑边。
+- 红/黄/绿仍是标准 macOS 按钮（关闭/最小化/缩放）。窗口 frame 存入
+  `NSUserDefaults`，每次启动恢复；游戏设置里的 Fullscreen/Borderless 仍然无效。
+- `getBackBufferWidth/Height` 改用真实 Cocoa drawable 尺寸，viewport 与字体
+  缩放跟随实际 backing，而不是 LWJGL 缓存的窗口尺寸。
+
+---
+
 # v1.2.9 — Native macOS window control only
 
 ## English

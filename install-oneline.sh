@@ -11,7 +11,7 @@ usage() {
 Usage: bash install-oneline.sh [--dry-run]
        curl -fsSL <published-script-url> | bash -s -- [--dry-run]
 
-Downloads and verifies the v1.2.9 Universal patch for macOS 11+.
+Downloads and verifies the v1.2.10 Universal patch for macOS 11+.
 Set STS_APP_PATH on the bash process to select a custom SlayTheSpire.app.
 --dry-run is passed to install.sh; it validates and stages a candidate without
 replacing game files. The existing installer creates temporary files beside
@@ -32,8 +32,8 @@ cleanup() {
 }
 
 main() {
-  local version=v1.2.9
-  local archive_sha256='30f505abea1044964916ef9e9d16a5cb95463214b98a034080e3af97777661e0'
+  local version=v1.2.10
+  local archive_sha256='407cf4c5c1ee2f20ec55f23029cd9d7710abd3344ad9d34ae07feee0d27d1cde'
   local asset base_url archive checksum unpack_dir expected actual tool arg rc
   local dry_run=0
 
@@ -98,7 +98,7 @@ main() {
 
   mkdir "$unpack_dir" || fail 'could not create extraction directory'
   unzip -q "$archive" -d "$unpack_dir" || fail 'release ZIP extraction failed'
-  # v1.2.9 puts install.sh at the ZIP root. Refuse other layouts explicitly.
+  # v1.2.10 puts install.sh at the ZIP root. Refuse other layouts explicitly.
   [ -f "$unpack_dir/install.sh" ] && [ ! -L "$unpack_dir/install.sh" ] \
     || fail 'release ZIP has no regular install.sh at its root'
 
