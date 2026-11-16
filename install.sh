@@ -430,6 +430,35 @@ for state_file in install-manifest.txt installed-jre.sha256 installed-overlay.sh
   mv "$WORK/new-state/$state_file" "$BACKUP/$state_file"
 done
 
+# BaseMod's screen post-processor renders every frame into a logical-size FBO
+# even when no post-processor is registered. On a 2x backing that means a
+# 1470x895 buffer is upscaled to 2940x1790 and text turns soft. Patch the
+# Workshop jar in place and keep the original beside the other backups.
+STEAMAPPS="$(dirname "$(dirname "$GAME_DIR")")"
+BASEMOD_JAR="$STEAMAPPS/workshop/content/646570/1605833019/BaseMod.jar"
+BASEMOD_MTS="$STEAMAPPS/workshop/content/646570/1605060445/ModTheSpire.jar"
+if [ -f "$BASEMOD_JAR" ] && [ -f "$BASEMOD_MTS" ]; then
+  BASEMOD_SHA="$(shasum -a 256 "$BASEMOD_JAR" | awk '{print $1}')"
+  BASEMOD_CLASS="basemod/patches/com/megacrit/cardcrawl/core/CardCrawlGame/ApplyScreenPostProcessor.class"
+  BASEMOD_CLASS_SHA="$(unzip -p "$BASEMOD_JAR" "$BASEMOD_CLASS" | shasum -a 256 | awk '{print $1}')"
+  if awk -v hash="$BASEMOD_CLASS_SHA" '$1 == hash { found=1 } END { exit !found }' \
+    "$SCRIPT_DIR/patched-basemod.sha256"; then
+    log "BaseMod HiDPI screen fix is already applied"
+  elif awk -v hash="$BASEMOD_SHA" '$1 == hash { found=1 } END { exit !found }' \
+    "$SCRIPT_DIR/supported-basemod.sha256"; then
+    [ -f "$BACKUP/BaseMod.jar" ] || cp -p "$BASEMOD_JAR" "$BACKUP/BaseMod.jar"
+    if "$RES/jre/bin/java" -cp "$PAYLOAD/basemod:$BASEMOD_MTS:$JAR" \
+      BaseModPatch "$BASEMOD_JAR" >/dev/null 2>&1; then
+      log "applied the BaseMod HiDPI screen fix"
+    else
+      cp -p "$BACKUP/BaseMod.jar" "$BASEMOD_JAR"
+      log "WARNING: BaseMod could not be patched; left unchanged"
+    fi
+  else
+    log "WARNING: unsupported BaseMod build; skipped the HiDPI screen fix"
+  fi
+fi
+
 ROLLBACK_NEEDED=0
 log "patch $PATCH_VERSION installed successfully for $HOST_ARCH"
 log "the original files are preserved at: $BACKUP"

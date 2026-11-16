@@ -13,6 +13,8 @@ required=(
   supported-versions.sha256 payload.sha256 payload/launcher payload/jar-delete.txt
   overlay-drop.txt
   display-overlay.sha256
+  supported-basemod.sha256 patched-basemod.sha256
+  payload/basemod/BaseModPatch.class
   payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class
   payload/jre/arm64/bin/java payload/jre/x86_64/bin/java
 )

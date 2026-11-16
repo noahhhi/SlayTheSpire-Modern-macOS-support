@@ -3,7 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 A community compatibility patch for the Steam macOS release of *Slay the
-Spire*. Version 1.2.5 is one Universal distribution for Intel and Apple
+Spire*. Version 1.2.6 is one Universal distribution for Intel and Apple
 Silicon Macs running macOS 11 or later.
 
 ## Features
@@ -48,13 +48,13 @@ resampling, just as it does for other Retina-aware apps.
 
 ### PKG (recommended)
 
-1. Download `SlayTheSpire-Modern-macOS-v1.2.5-universal.pkg` and its `.sha256`
+1. Download `SlayTheSpire-Modern-macOS-v1.2.6-universal.pkg` and its `.sha256`
    file from [Releases](../../releases).
 2. Optional integrity check:
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.5-universal.pkg.sha256
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.6-universal.pkg.sha256
    ```
 
 3. Open the package. It finds the logged-in user's Steam library and runs the
@@ -64,14 +64,14 @@ The package is currently ad-hoc/unsigned. If macOS blocks it, open System
 Settings > Privacy & Security and choose **Open Anyway**. Do not disable
 Gatekeeper globally.
 
-A verified v1.2.1-v1.2.3 installation upgrades in place: the installer builds v1.2.5
+A verified v1.2.1-v1.2.3 installation upgrades in place: the installer builds v1.2.6
 from the preserved original jar, keeps the original backup, and restores the
 previous patch automatically if the upgrade fails. Unknown or modified
 older builds are refused without changing the game.
 
 ### ZIP fallback
 
-1. Download and verify `SlayTheSpire-Modern-macOS-v1.2.5-universal.zip`.
+1. Download and verify `SlayTheSpire-Modern-macOS-v1.2.6-universal.zip`.
 2. Extract it and double-click `Install SlayTheSpire Modern macOS.command`, or
    run:
 
@@ -94,7 +94,7 @@ the app.
 ### Terminal download helper
 
 Requires macOS 11 or later and an existing Steam installation of the game.
-Quit the game before running this command. It downloads the **v1.2.5** Universal
+Quit the game before running this command. It downloads the **v1.2.6** Universal
 ZIP (about 83 MB), verifies its release `.sha256` against the hash pinned in the script, extracts it into a temporary
 directory, and runs the included `install.sh`. Without `--dry-run`, the installer
 backs up and replaces game files.
@@ -125,7 +125,7 @@ These commands execute code from this repository. You can download and inspect
 `install-oneline.sh` before running it. The checksum checks the ZIP's integrity;
 it is not an independent signature of the release or the helper. `pipefail` also
 reports failures while downloading the helper itself. This entry point adds no
-`sudo` or Gatekeeper commands; the existing v1.2.5 installer does clear quarantine
+`sudo` or Gatekeeper commands; the existing v1.2.6 installer does clear quarantine
 attributes on the replacement JRE, JAR, and launcher during a normal install.
 The helper downloads only the patch release, not the game.
 
@@ -192,10 +192,10 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
   checksum-bypass option because applying bytecode patches to an unknown build
   is unsafe.
 - **Legacy ARM64 backup found:** run the v1.0.0 `uninstall.sh` first, confirm
-  Steam launches the original game, then install v1.2.5.
+  Steam launches the original game, then install v1.2.6.
 - **Steam reports AppError 46 / Failed to spawn process:** v1.2.1 used a shell
   script as the app executable, which the native Apple Silicon Steam client
-  could not spawn. Install v1.2.5 or later; installing Rosetta is not required.
+  could not spawn. Install v1.2.6 or later; installing Rosetta is not required.
 - **Game is running:** quit it completely and retry.
 - **Direct launch crashes in `SteamAppsNative_getAppBuildId`:** Steamworks was
   not initialized, so the game's integration dereferenced a null `SteamApps`
@@ -242,7 +242,7 @@ their components retain their upstream licenses. Azul Zulu OpenJDK is provided
 under GPLv2 with the Classpath Exception; its license files are included in the
 runtime payload.
 
-## Modded launch in v1.2.5
+## Modded launch in v1.2.6
 
 The old `mts-launcher.jar` uses a Steamworks Java/native pairing that cannot be
 fixed by swapping in the newer arm64 native alone. The installer replaces only

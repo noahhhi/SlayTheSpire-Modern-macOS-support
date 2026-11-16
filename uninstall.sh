@@ -110,6 +110,11 @@ if [ "${STS_TEST_FAIL_AFTER_RESTORE:-0}" = 1 ]; then
   fail 'injected restore failure for rollback verification'
 fi
 
+if [ -f "$BACKUP/BaseMod.jar" ]; then
+  BASEMOD_JAR="$(dirname "$(dirname "$GAME_DIR")")/workshop/content/646570/1605833019/BaseMod.jar"
+  [ ! -f "$BASEMOD_JAR" ] || cp -p "$BACKUP/BaseMod.jar" "$BASEMOD_JAR"
+fi
+
 EXPECTED_SHA="$(sed -n 's/^original-jar-sha256=//p' "$BACKUP/install-manifest.txt" 2>/dev/null || true)"
 RESTORED_SHA="$(shasum -a 256 "$RES/desktop-1.0.jar" | awk '{print $1}')"
 [ -z "$EXPECTED_SHA" ] || [ "$RESTORED_SHA" = "$EXPECTED_SHA" ] \

@@ -67,8 +67,28 @@ public final class PrepareDisplayOverlay {
                 "  System.setProperty(\"org.lwjgl.opengl.Window.undecorated\", \"true\");" +
                 "}");
 
+        // Do not keep drawing while the window is unfocused or paused.
+        load.insertAfter("$1.backgroundFPS = -1;");
+
+        // Fullscreen toggles used the live window size; on HiDPI that shrank
+        // info.displayconfig by the title-bar height on every toggle.
+        CtClass toggle = pool.get("com.megacrit.cardcrawl.screens.options.ToggleButton");
+        CtMethod toggleMethod = toggle.getDeclaredMethod("toggle", new CtClass[0]);
+        toggleMethod.instrument(new javassist.expr.ExprEditor() {
+            public void edit(javassist.expr.MethodCall call) throws javassist.CannotCompileException {
+                if (call.getClassName().equals("com.badlogic.gdx.Graphics")) {
+                    if (call.getMethodName().equals("getWidth")) {
+                        call.replace("$_ = com.megacrit.cardcrawl.core.Settings.SAVED_WIDTH;");
+                    } else if (call.getMethodName().equals("getHeight")) {
+                        call.replace("$_ = com.megacrit.cardcrawl.core.Settings.SAVED_HEIGHT;");
+                    }
+                }
+            }
+        });
+
         graphics.writeFile(args[2]);
         launcher.writeFile(args[2]);
+        toggle.writeFile(args[2]);
     }
 }
 JAVA
@@ -81,5 +101,7 @@ cp -p "$WORK/out/com/badlogic/gdx/backends/lwjgl/LwjglGraphics.class" \
   "$ROOT/payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglGraphics.class"
 cp -p "$WORK/out/com/megacrit/cardcrawl/desktop/DesktopLauncher.class" \
   "$ROOT/payload/jar/com/megacrit/cardcrawl/desktop/DesktopLauncher.class"
+cp -p "$WORK/out/com/megacrit/cardcrawl/screens/options/ToggleButton.class" \
+  "$ROOT/payload/jar/com/megacrit/cardcrawl/screens/options/ToggleButton.class"
 
 bash "$ROOT/tests/test-display-overlay.sh"

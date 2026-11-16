@@ -1,3 +1,44 @@
+# v1.2.6 — Crisp BaseMod text, idle background, stable display state
+
+## English
+
+- Fixes the blurred text that appeared only after loading BaseMod. BaseMod's
+  `ApplyScreenPostProcessor` always rendered the frame into a logical-size
+  `1470x895` FBO and then upscaled it to the `2940x1790` Retina backbuffer, even
+  when no post-processor was registered. The installer now patches that
+  Workshop class so the FBO path is skipped while `postProcessors` is empty.
+  Verified by screenshot: menu edge energy went from `82` back to `145`
+  (vanilla `147`), logo from `185` to `380` (vanilla `387`).
+- The patch is applied to the user's own `BaseMod.jar`, with the original kept
+  next to the installer backup and restored by `uninstall.sh`. Unknown BaseMod
+  builds are left untouched with a warning; the hash of the supported build is
+  pinned in `supported-basemod.sha256`.
+- Window focus loss now stops rendering: `backgroundFPS` is set to `-1`, so an
+  unfocused/paused game does not keep drawing frames. The loop still ticks at a
+  low rate only to process events.
+- Fullscreen/borderless toggles no longer write the live window height into
+  `info.displayconfig`. They write `Settings.SAVED_WIDTH/SAVED_HEIGHT`, so the
+  saved resolution no longer shrinks by the title-bar height on every toggle
+  and switching back to windowed mode survives restarts.
+
+## 中文
+
+- 修复只有加载 BaseMod 后文字才发糊的问题。BaseMod 的
+  `ApplyScreenPostProcessor` 在没有任何 post-processor 时也会把整帧画到逻辑尺寸
+  `1470x895` 的 FBO，再放大到 `2940x1790` 的 Retina drawable。安装器现在会
+  修改 Workshop 里的这个类：`postProcessors` 为空时跳过 FBO 路径。截图实测：
+  菜单边缘强度 `82 → 145`（原版 `147`），Logo `185 → 380`（原版 `387`）。
+- 只修改用户本机的 `BaseMod.jar`，原文件保留在安装器备份目录，
+  `uninstall.sh` 会原样恢复；未知版本只给出警告不改动。支持版本哈希固定在
+  `supported-basemod.sha256`。
+- 窗口失焦后停止绘制：`backgroundFPS` 设为 `-1`，后台/暂停时不再持续出帧，
+  仅保留低频事件循环。
+- 全屏/无边框切换不再把当前窗口高度写进 `info.displayconfig`，改用
+  `Settings.SAVED_WIDTH/SAVED_HEIGHT`，避免每次切换高度递减（标题栏高度），
+  并修复“全屏退出后重启无法切回窗口模式”的状态问题。
+
+---
+
 # v1.2.5 — HiDPI fill on notch MacBooks
 
 ## English

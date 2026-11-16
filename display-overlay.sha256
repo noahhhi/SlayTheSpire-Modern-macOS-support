@@ -1,3 +1,4 @@
-# Patched display classes. See scripts/prepare-display-overlay.sh.
+# Patched display/state classes. See scripts/prepare-display-overlay.sh.
 3b244e57ae37b77a1928acd86983750d174d2cb8e62774b6e05a7fcb52882763  payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglGraphics.class
-e6dc8bdc7277853730b2511ac9896addf37304919ccb48947ac8975fb63c35d0  payload/jar/com/megacrit/cardcrawl/desktop/DesktopLauncher.class
+bb23b91e0b8c8c6731262500415edb59cb1362c686b9469bca3a422d2e4f0bf2  payload/jar/com/megacrit/cardcrawl/desktop/DesktopLauncher.class
+30415d5dac8e6ddf58712b0ebdeac17915f8a961b1f2e1fb641dada1e5f5fd09  payload/jar/com/megacrit/cardcrawl/screens/options/ToggleButton.class

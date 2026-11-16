@@ -32,6 +32,7 @@ mkdir -p "$DIST" "$STAGE" "$PKGROOT$INSTALL_LOCATION" "$PKGSCRIPTS"
 cp install.sh uninstall.sh 'Install SlayTheSpire Modern macOS.command' \
   install-state.sh README.md README.zh-CN.md RELEASE_NOTES.md VERSION \
   supported-versions.sha256 supported-upgrades.sha256 supported-mts-launchers.sha256 \
+  supported-basemod.sha256 patched-basemod.sha256 \
   overlay-drop.txt display-overlay.sha256 "$STAGE/"
 cp -R payload "$STAGE/payload"
 mkdir -p "$STAGE/payload/mts" "$STAGE/payload/mts-source"
