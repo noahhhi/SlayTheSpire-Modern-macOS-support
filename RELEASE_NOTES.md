@@ -1,3 +1,59 @@
+# v1.2.4 — BaseMod patch compatibility for the modded launch
+
+## English
+
+- Fixes the arm64 modded launch failing while BaseMod patches
+  `CardCrawlGame.loadPostCombat`:
+  `javassist.CannotCompileException: [source error] no such field: i`.
+- Root cause was the game overlay, not the curl download. The upstream HiDPI
+  port recompiled `CardCrawlGame` from decompiled source. That class kept the
+  game logic but lost its `LocalVariableTable` and shifted every source line
+  number. ModTheSpire inserts patches by line and binds named locals; BaseMod's
+  `CustomRewardLoad` reads the local `i`, so javassist fell back to field
+  lookup and aborted. PKG and curl installs shared the same broken class.
+- Rebuilds `CardCrawlGame.class` from the unmodified Steam bytecode and inserts
+  only the required `StsDisplay.onWindowResize` call in `resize(int, int)`.
+  Line numbers, locals, and every other method stay byte-identical to the
+  Steam 12-18-2022 jar.
+- Stops shipping recompiled copies of helper classes that are identical to the
+  original (`CardCrawlGame$1`, `CardCrawlGame$2`, `CardCrawlGame$GameMode`,
+  `Settings$1`, `Settings$GameLanguage`, `ToggleButton$1`,
+  `ToggleButton$ToggleBtnType`). The untouched originals keep their debug
+  metadata.
+- Adds `tests/test-overlay-debug-info.py` to the release build. It parses the
+  shipped class and fails if `loadPostCombat` loses its `LocalVariableTable`
+  or the local `i`, or if the resize hook disappears.
+- Verified offline with ModTheSpire 3.30.3 and BaseMod 5.56.0: the old class
+  reproduces `no such field: i` at the locator's line; the rebuilt class binds
+  `i` and the two other `CardCrawlGame` insert patches (`sb`, `camera`) cleanly.
+- Verified v1.2.1-v1.2.3 installations upgrade in place. Unknown builds are
+  still refused without touching the game.
+
+## 中文
+
+- 修复 Apple Silicon 模组启动在 BaseMod 打补丁阶段中止的问题：
+  `javassist.CannotCompileException: [source error] no such field: i`。
+- 根因不是 curl 下载，而是游戏 class overlay：上游 HiDPI 版本用反编译源码
+  重新编译了 `CardCrawlGame`，逻辑虽然保留，但 `LocalVariableTable` 丢失、
+  源码行号整体改变。ModTheSpire 按行号插入补丁并按名字绑定局部变量，
+  BaseMod 的 `CustomRewardLoad` 需要局部变量 `i`，javassist 只能当作字段
+  查找，于是报错。PKG 和 curl 安装共用同一份有问题的 class。
+- 改为直接从 Steam 原版字节码构造 `CardCrawlGame.class`，仅在
+  `resize(int, int)` 中插入必要的 `StsDisplay.onWindowResize` 调用；行号、
+  局部变量表以及其余方法都与 12-18-2022 Steam jar 完全一致。
+- 不再覆盖与原版完全相同、但被重新编译过的辅助类（`CardCrawlGame$1`、
+  `$2`、`$GameMode`、`Settings$1`、`Settings$GameLanguage`、
+  `ToggleButton$1`、`ToggleButton$ToggleBtnType`），保留原版调试信息。
+- 构建新增 `tests/test-overlay-debug-info.py`：解析发布 class，检查
+  `loadPostCombat` 是否仍有 `LocalVariableTable` 和局部变量 `i`，以及 resize
+  钩子是否存在，缺失即失败。
+- 使用 ModTheSpire 3.30.3 + BaseMod 5.56.0 离线验证：旧 class 在定位行复现
+  `no such field: i`；新 class 可绑定 `i`，另外两个 `CardCrawlGame` 插入补丁
+  （`sb`、`camera`）同样通过。
+- 已验证 v1.2.1 至 v1.2.3 可原地升级；未知 build 仍会在零写入状态下拒绝。
+
+---
+
 # v1.2.3 — Local Workshop modded launch
 
 ## English

@@ -11,6 +11,7 @@ required=(
   payload/mts-source/com/megacrit/mtslauncher/MtsFinder.java
   VERSION README.md README.zh-CN.md RELEASE_NOTES.md install.sh install-state.sh uninstall.sh
   supported-versions.sha256 payload.sha256 payload/launcher payload/jar-delete.txt
+  overlay-drop.txt
   payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class
   payload/jre/arm64/bin/java payload/jre/x86_64/bin/java
 )
@@ -39,8 +40,12 @@ if LC_ALL=C grep -a -Eq 'SteamAPI|SteamUGC|loadLibrary' "$MTS_CLASS"; then
 fi
 
 OVERLAY_CLASS_COUNT="$(find payload/jar -type f -name '*.class' | wc -l | tr -d ' ')"
-[ "$OVERLAY_CLASS_COUNT" -eq 42 ] \
-  || { echo "unexpected Java overlay size: $OVERLAY_CLASS_COUNT classes (expected 42)" >&2; exit 1; }
+# 42 upstream classes minus the helpers listed in overlay-drop.txt that are
+# instruction-identical to the Steam originals (shipping them would only drop
+# LocalVariableTable data that ModTheSpire patches rely on).
+EXPECTED_OVERLAY=$((42 - $(grep -vcE '^\s*(#|$)' overlay-drop.txt)))
+[ "$OVERLAY_CLASS_COUNT" -eq "$EXPECTED_OVERLAY" ] \
+  || { echo "unexpected Java overlay size: $OVERLAY_CLASS_COUNT classes (expected $EXPECTED_OVERLAY)" >&2; exit 1; }
 
 GEOMETRY_CLASS='payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglDisplayGeometry.class'
 GRAPHICS_CLASS='payload/jar/com/badlogic/gdx/backends/lwjgl/LwjglGraphics.class'

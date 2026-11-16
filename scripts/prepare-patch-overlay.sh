@@ -88,5 +88,17 @@ OVERLAY_CLASS_COUNT="$(find "$OVERLAY" -type f -name '*.class' | wc -l | tr -d '
   exit 1
 }
 
-echo "Merged 41 class files and Universal liblwjgl into $OVERLAY"
+# The upstream CardCrawlGame was recompiled without debug info, which breaks
+# ModTheSpire patches that bind named locals (BaseMod's CustomRewardLoad reads
+# "i"). Rebuild it from the unmodified Steam jar and drop helper classes that
+# are identical to the originals.
+if [ -n "${ORIGINAL_JAR:-}" ]; then
+  "$ROOT/scripts/prepare-cardcrawlgame-overlay.sh" "$ORIGINAL_JAR"
+else
+  echo 'ORIGINAL_JAR is not set; the CardCrawlGame overlay still needs' >&2
+  echo "  ORIGINAL_JAR=<unmodified desktop-1.0.jar> $0" >&2
+  python3 "$ROOT/tests/test-overlay-debug-info.py"
+fi
+
+echo "Merged overlay classes and Universal liblwjgl into $OVERLAY"
 echo "No complete desktop-1.0.jar was copied. Run build.sh to regenerate payload.sha256."

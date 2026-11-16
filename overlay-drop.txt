@@ -1,0 +1,27 @@
+# Upstream overlay classes that are instruction-identical to the Steam
+# 12-18-2022 jar. Shipping them would only replace original bytecode that still
+# has a LocalVariableTable and original source line numbers, which ModTheSpire
+# patches need. Paths are relative to payload/jar.
+com/badlogic/gdx/backends/lwjgl/LwjglApplication$1.class
+com/badlogic/gdx/backends/lwjgl/LwjglApplication$2.class
+com/badlogic/gdx/backends/lwjgl/LwjglGraphics$LwjglDisplayMode.class
+com/badlogic/gdx/backends/lwjgl/LwjglGraphics$LwjglMonitor.class
+com/badlogic/gdx/backends/lwjgl/LwjglGraphics$SetDisplayModeCallback.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$1.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$2.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$3$1.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$3$2.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$3$3.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$3.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$KeyEvent.class
+com/badlogic/gdx/backends/lwjgl/LwjglInput$TouchEvent.class
+com/badlogic/gdx/graphics/g2d/freetype/FreeTypeFontGenerator$1.class
+com/badlogic/gdx/graphics/g2d/freetype/FreeTypeFontGenerator$GlyphAndBitmap.class
+com/badlogic/gdx/graphics/g2d/freetype/FreeTypeFontGenerator$Hinting.class
+com/megacrit/cardcrawl/core/CardCrawlGame$1.class
+com/megacrit/cardcrawl/core/CardCrawlGame$2.class
+com/megacrit/cardcrawl/core/CardCrawlGame$GameMode.class
+com/megacrit/cardcrawl/core/Settings$1.class
+com/megacrit/cardcrawl/core/Settings$GameLanguage.class
+com/megacrit/cardcrawl/screens/options/ToggleButton$1.class
+com/megacrit/cardcrawl/screens/options/ToggleButton$ToggleBtnType.class

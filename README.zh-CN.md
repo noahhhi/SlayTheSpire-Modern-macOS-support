@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-这是面向 Steam macOS 版《杀戮尖塔》的社区兼容补丁。v1.2.3 使用同一份
+这是面向 Steam macOS 版《杀戮尖塔》的社区兼容补丁。v1.2.4 使用同一份
 Universal 发布包支持 Intel 与 Apple Silicon Mac，最低系统为 macOS 11。
 
 ## 功能
@@ -39,12 +39,12 @@ App、存档、美术、音频或其他游戏本体内容。使用前必须已�
 ### PKG（推荐）
 
 1. 从 [Releases](../../releases) 下载
-   `SlayTheSpire-Modern-macOS-v1.2.3-universal.pkg` 和对应 `.sha256`。
+   `SlayTheSpire-Modern-macOS-v1.2.4-universal.pkg` 和对应 `.sha256`。
 2. 可选：校验下载文件：
 
    ```bash
    cd ~/Downloads
-   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.3-universal.pkg.sha256
+   shasum -a 256 -c SlayTheSpire-Modern-macOS-v1.2.4-universal.pkg.sha256
    ```
 
 3. 打开安装包。PKG 会找到当前登录用户，并以该用户身份修改其 Steam 游戏目录，
@@ -53,13 +53,13 @@ App、存档、美术、音频或其他游戏本体内容。使用前必须已�
 当前安装包未使用 Developer ID 签名/公证。如被拦截，请进入“系统设置 → 隐私与
 安全性”选择“仍要打开”；不要全局关闭 Gatekeeper。
 
-已完整验证的 v1.2.1 或 v1.2.2 可直接原地升级：安装器从保存的原版 jar 构造 v1.2.3，继续
+已完整验证的 v1.2.1 至 v1.2.3 可直接原地升级：安装器从保存的原版 jar 构造 v1.2.4，继续
 保留原版备份；若升级失败则自动恢复原来的补丁版本。未知或被修改的旧 build 会在
 零写入状态下拒绝，不会改动游戏。
 
 ### ZIP 回退包
 
-下载、校验并解压 `SlayTheSpire-Modern-macOS-v1.2.3-universal.zip`，双击
+下载、校验并解压 `SlayTheSpire-Modern-macOS-v1.2.4-universal.zip`，双击
 `Install SlayTheSpire Modern macOS.command`，或在终端执行：
 
 ```bash
@@ -79,7 +79,7 @@ jar、当前架构的 Zulu JRE，并在临时目录构造候选 jar，确认所�
 ### 终端一键下载入口
 
 需要 macOS 11 或更高版本，且已通过 Steam 安装游戏。运行前请完全退出游戏。
-命令会下载 **v1.2.3** Universal ZIP（约 83 MB），使用 Release 的 `.sha256`
+命令会下载 **v1.2.4** Universal ZIP（约 83 MB），使用 Release 的 `.sha256`
 校验，解压到临时目录并运行包内 `install.sh`。未传入 `--dry-run` 时，安装器
 会备份并替换游戏文件。
 
@@ -107,7 +107,7 @@ jar、当前架构的 Zulu JRE，并在临时目录构造候选 jar，确认所�
 上述命令会执行此仓库提供的代码，也可以先下载并检查 `install-oneline.sh`
 再运行。SHA-256 用于核对 ZIP 完整性，不是对 Release 或入口脚本的独立签名。
 命令中的 `pipefail` 也会报告入口脚本自身的下载失败。此入口没有新增 `sudo`
-或 Gatekeeper 操作；但 v1.2.3 原有安装器在正常安装时会清除替换后的 JRE、JAR
+或 Gatekeeper 操作；但 v1.2.4 原有安装器在正常安装时会清除替换后的 JRE、JAR
 和启动器的 quarantine 属性。入口只下载补丁发布包，不下载游戏本体。
 
 
@@ -164,10 +164,10 @@ grep 'sts-modern' /var/log/install.log > ~/Desktop/SlayTheSpire-pkg-install.log
 - **原版 jar 不受支持或已修改：** 在 Steam 验证游戏文件。本项目不提供跳过校验
   的参数，避免把字节码补丁应用到未知版本。
 - **发现旧 ARM64 备份：** 先用 v1.0.0 的 `uninstall.sh` 还原并确认原版能启动，
-  再安装 v1.2.3。
+  再安装 v1.2.4。
 - **Steam 显示 AppError 46 / Failed to spawn process：** v1.2.1 使用脚本作为
   App 主可执行文件，原生 Apple Silicon Steam 客户端无法创建该进程。安装
-  v1.2.3 或更高版本即可，不需要为此安装 Rosetta。
+  v1.2.4 或更高版本即可，不需要为此安装 Rosetta。
 - **提示游戏正在运行：** 完全退出游戏后重试。
 - **直接启动崩溃在 `SteamAppsNative_getAppBuildId`：** Steamworks 未初始化，游戏
   随后解引用了空的 `SteamApps` 接口。运行验收应从 Steam 客户端启动；直接执行
@@ -211,7 +211,7 @@ Release。构建会为 PKG/ZIP 生成 SHA-256；任何未通过门禁的产物�
 本项目与 Mega Crit、Valve 无关。LWJGL、libGDX 等组件沿用各自上游许可证；Azul
 Zulu OpenJDK 使用 GPLv2 + Classpath Exception，相关许可证随运行时一起提供。
 
-## v1.2.3 模组启动修复
+## v1.2.4 模组启动修复
 
 旧 `mts-launcher.jar` 的 Steamworks Java/native ABI 不匹配，不能只替换 arm64
 原生库。新版仅替换 `com/megacrit/mtslauncher/MtsFinder.class`，保留 Java 8
