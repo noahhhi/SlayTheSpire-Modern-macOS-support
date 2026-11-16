@@ -91,6 +91,45 @@ candidate patched jar, verifies the selected Zulu JRE, and verifies that every
 installed macOS native matches the detected host architecture without changing
 the app.
 
+### Terminal download helper
+
+Requires macOS 11 or later and an existing Steam installation of the game.
+Quit the game before running this command. It downloads the **v1.2.2** Universal
+ZIP (about 83 MB), verifies its release `.sha256`, extracts it into a temporary
+directory, and runs the included `install.sh`. Without `--dry-run`, the installer
+backs up and replaces game files.
+
+```bash
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/noahhhi/SlayTheSpire-Modern-macOS-support/main/install-oneline.sh | bash )
+```
+
+To validate first, pass `--dry-run`:
+
+```bash
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/noahhhi/SlayTheSpire-Modern-macOS-support/main/install-oneline.sh | bash -s -- --dry-run )
+```
+
+For a custom Steam library, set `STS_APP_PATH` on the **bash side** of the pipe:
+
+```bash
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/noahhhi/SlayTheSpire-Modern-macOS-support/main/install-oneline.sh | STS_APP_PATH="/Volumes/Games/SteamLibrary/steamapps/common/SlayTheSpire/SlayTheSpire.app" bash -s -- --dry-run )
+```
+
+Remove `--dry-run` to install. The existing dry run builds temporary candidates
+beside the game and cleans them up; it does not replace files inside the app.
+The helper stops if the checksum cannot be downloaded, is malformed, or does
+not match. It removes its download/extraction directory on exit. Download and
+extract the ZIP again when you need `uninstall.sh`; keep the original backup.
+
+These commands execute code from this repository. You can download and inspect
+`install-oneline.sh` before running it. The checksum checks the ZIP's integrity;
+it is not an independent signature of the release or the helper. `pipefail` also
+reports failures while downloading the helper itself. This entry point adds no
+`sudo` or Gatekeeper commands; the existing v1.2.2 installer does clear quarantine
+attributes on the replacement JRE, JAR, and launcher during a normal install.
+The helper downloads only the patch release, not the game.
+
+
 ## Universal implementation
 
 The archive bundles matching Azul Zulu 8.96.0.205 JREs for `arm64` and
