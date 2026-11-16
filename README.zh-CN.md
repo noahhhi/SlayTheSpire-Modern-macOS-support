@@ -76,6 +76,41 @@ App、存档、美术、音频或其他游戏本体内容。使用前必须已�
 jar、当前架构的 Zulu JRE，并在临时目录构造候选 jar，确认所有 macOS native 都
 只含检测到的主机架构；不会修改游戏 App。
 
+### 终端一键下载入口
+
+需要 macOS 11 或更高版本，且已通过 Steam 安装游戏。运行前请完全退出游戏。
+命令会下载 **v1.2.2** Universal ZIP（约 83 MB），使用 Release 的 `.sha256`
+校验，解压到临时目录并运行包内 `install.sh`。未传入 `--dry-run` 时，安装器
+会备份并替换游戏文件。
+
+```bash
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/noahhhi/SlayTheSpire-Modern-macOS-support/main/install-oneline.sh | bash )
+```
+
+建议先透传 `--dry-run` 做预检：
+
+```bash
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/noahhhi/SlayTheSpire-Modern-macOS-support/main/install-oneline.sh | bash -s -- --dry-run )
+```
+
+自定义 Steam 库可在管道的 **bash 一侧**设置 `STS_APP_PATH`：
+
+```bash
+( set -o pipefail; curl -fsSL https://raw.githubusercontent.com/noahhhi/SlayTheSpire-Modern-macOS-support/main/install-oneline.sh | STS_APP_PATH="/Volumes/Games/SteamLibrary/steamapps/common/SlayTheSpire/SlayTheSpire.app" bash -s -- --dry-run )
+```
+
+删除 `--dry-run` 即执行安装。现有安装器的预检会在游戏旁创建并清理临时候选
+文件，但不替换 App 内的文件。校验文件下载失败、格式异常或哈希不符都会停止。
+入口退出时会删除下载和解压临时目录；以后需要 `uninstall.sh` 时，请重新下载
+并解压 ZIP，同时保留原版备份。
+
+上述命令会执行此仓库提供的代码，也可以先下载并检查 `install-oneline.sh`
+再运行。SHA-256 用于核对 ZIP 完整性，不是对 Release 或入口脚本的独立签名。
+命令中的 `pipefail` 也会报告入口脚本自身的下载失败。此入口没有新增 `sudo`
+或 Gatekeeper 操作；但 v1.2.2 原有安装器在正常安装时会清除替换后的 JRE、JAR
+和启动器的 quarantine 属性。入口只下载补丁发布包，不下载游戏本体。
+
+
 ## Universal 实现
 
 发布包内置同版本 Azul Zulu 8.96.0.205 的 arm64/x86_64 JRE，安装器依据
