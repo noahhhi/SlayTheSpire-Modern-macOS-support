@@ -1,3 +1,37 @@
+# v1.2.9 — Native macOS window control only
+
+## English
+
+- The game's own Fullscreen / Borderless Fullscreen toggles are now inert and the
+  saved display flags are ignored. Window mode is controlled exclusively by the
+  standard macOS traffic-light buttons, exactly like any other Mac app.
+- Green button: native macOS fullscreen (a normal fullscreen Space). The window
+  fills the screen below the notch, and moving the pointer to the top reveals
+  the menu bar and title bar again. Yellow minimizes, red closes.
+- Window style is remembered across launches via
+  `NSUserDefaults` (`io.github.noahhhi.sts-modern`): the windowed frame is saved
+  on move/resize/exit-fullscreen, and if the game was quit in fullscreen the
+  next launch re-enters fullscreen after the window appears.
+- `StsViewport` still stretches the design canvas over the drawable, so neither
+  mode shows letterbox bars and the cached UI layout is unchanged.
+- Keep the v1.2.6 BaseMod HiDPI fix, idle background rendering and stable
+  display config.
+
+## 中文
+
+- 游戏设置里的 Fullscreen / Borderless 开关现在不再生效，保存的显示标志也被忽略；
+  窗口模式完全由 macOS 标准的三色按钮控制，和普通 Mac 应用一致。
+- 绿色按钮：进入原生 macOS 全屏（普通全屏 Space），窗口铺满刘海以下区域，
+  鼠标移到顶部会重新显示菜单栏和标题栏；黄色最小化、红色关闭照常工作。
+- 通过 `NSUserDefaults`（`io.github.noahhhi.sts-modern`）记忆窗口样式：移动/缩放/
+  退出全屏时保存窗口 frame；如果上次是在全屏状态退出，下次启动会在窗口出现后
+  自动进入全屏。
+- `StsViewport` 继续把设计画布拉伸铺满 drawable，两种模式都没有 letterbox 黑边，
+  UI 缓存布局不受影响。
+- 保留 v1.2.6 的 BaseMod HiDPI 修复、后台暂停和显示配置稳定性。
+
+---
+
 # v1.2.8 — Live windowed fullscreen with working window buttons
 
 ## English
